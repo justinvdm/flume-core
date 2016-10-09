@@ -1,0 +1,32 @@
+{
+  "name": "flume",
+  "version": "0.0.0",
+  "description": "an experiment about data flow",
+  "license": "MIT",
+  "repository": "justinvdm/flume",
+  "author": {
+    "name": "justinvdm",
+    "email": "justinvdm.0.1.0@gmail.com",
+    "url": "justinvdm.github.io"
+  },
+  "engines": {
+    "node": ">=4"
+  },
+  "scripts": {
+    "test": "ava",
+    "lint": "eslint index.js test.js",
+    "ci": "npm lint && npm test"
+  },
+  "files": [
+    "index.js"
+  ],
+  "keywords": [
+    ""
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "ava": "^0.15.2",
+    "babel-eslint": "^7.0.0",
+    "eslint": "^3.7.1"
+  }
+}
