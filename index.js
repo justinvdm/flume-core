@@ -53,12 +53,18 @@ class Node {
     this.child = child;
     this.parentIndex = parentIndex;
     this.state = this.def._init();
+    this.queue = thenable(null);
   }
 
   process(msg) {
-    const [newState, newMsg] = this.def._process(this.state, msg, this.parentIndex);
-    this.state = newState;
-    return newMsg;
+    return this.queue = this.queue
+      .then(() => this.def._process(this.state, msg, this.parentIndex))
+      .then(resolveSync)
+      .then(([newState, newMsg]) => {
+        // TODO validate that an array is returned
+        this.state = newState;
+        return newMsg;
+      });
   }
 }
 
@@ -69,6 +75,10 @@ class Graph {
   }
 
   dispatch(targetInput, msg) {
+    // note: we intentionally do not return `process`'s result, it could be our
+    // thenable implementation rather than a promise, and we shouldn't be
+    // exposing this as part of the api. unhandled rejections shouldn't be an
+    // issue here, provided we handle them appropriately in `process`
     for (const [input, node] of this.inputs) {
       if (input === targetInput) process(node, msg);
     }
@@ -79,8 +89,9 @@ class Graph {
 
 
 function process(node, msg) {
-  const newMsg = node.process(msg);
-  if (node.child) process(node.child, newMsg);
+  // TODO actual error handling
+  return node.process(msg)
+    .then(res => node.child && process(node.child, res));
 }
 
 
@@ -111,6 +122,61 @@ function transform(...args) {
 
 
 function noop() {
+}
+
+
+function maybeAsync(fn) {
+  return (...args) => {
+    try {
+      const v = fn(...args);
+      return thenable(v);
+    } catch (e) {
+      return thenableError(e);
+    }
+  };
+}
+
+
+function thenable(v) {
+  return !(v || 0).then
+    ? thenableValue(v)
+    : v;
+}
+
+
+function thenableValue(v) {
+  return {then: maybeAsync(resolveFn => resolveFn(v))};
+}
+
+
+function thenableError(e) {
+  return {then: maybeAsync((_, rejectFn = thrower) => rejectFn(e))};
+}
+
+
+function thrower(e) {
+  throw e;
+}
+
+
+function resolveSync(values) {
+  if (!Array.isArray(values)) return thenable(values);
+  const res = [];
+  const n = values.length;
+  let i = -1;
+  let j = -1;
+  let p = thenable(null);
+
+  while (++i < n) p = p.then(call);
+  return p.then(() => res);
+
+  function call() {
+    return thenable(values[++j]).then(push);
+  }
+
+  function push(v) {
+    res.push(v);
+  }
 }
 
 

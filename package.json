@@ -27,6 +27,7 @@
   "devDependencies": {
     "ava": "^0.15.2",
     "babel-eslint": "^7.0.0",
-    "eslint": "^3.7.1"
+    "eslint": "^3.7.1",
+    "immediate-promise": "^1.1.0"
   }
 }

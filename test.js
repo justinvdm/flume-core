@@ -1,4 +1,5 @@
 import test from 'ava';
+import immediate from 'immediate-promise';
 import { input } from '.';
 
 
@@ -28,3 +29,133 @@ test('value propagation', t => {
 
   t.deepEqual(res, [45, 70]);
 });
+
+
+test('promise-based transform results', async t => {
+  const src = input();
+  const res = [];
+  const d1 = defer();
+  const d2 = defer();
+
+  const graph = src
+    .pipe({
+      init: () => 2,
+      transform: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
+    })
+    .pipe({
+      transform: (_, v) => [null, v + 1]
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create();
+
+  graph
+    .dispatch(src, d1)
+    .dispatch(src, d2);
+
+  t.deepEqual(res, []);
+
+  d2.resolve(23);
+  await immediate();
+  t.deepEqual(res, []);
+
+  d1.resolve(21);
+  await immediate();
+  t.deepEqual(res, [45, 70]);
+});
+
+
+test('promise-based transform state results', async t => {
+  const src = input();
+  const res = [];
+  const d1 = defer();
+  const d2 = defer();
+
+  const graph = src
+    .pipe({
+      init: () => 2,
+      transform: (state, d) => [d.promise, state]
+    })
+    .pipe({
+      transform: (_, v) => [null, v + 1]
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create();
+
+  graph
+    .dispatch(src, d1)
+    .dispatch(src, d2);
+
+  t.deepEqual(res, []);
+
+  d2.resolve(23);
+  await immediate();
+  t.deepEqual(res, []);
+
+  d1.resolve(21);
+  await immediate();
+  t.deepEqual(res, [3, 22]);
+});
+
+
+test('promise-based transform msg results', async t => {
+  const src = input();
+  const res = [];
+  const d1 = defer();
+  const d2 = defer();
+
+  const graph = src
+    .pipe({
+      transform: (_, d) => [null, d.promise]
+    })
+    .pipe({
+      transform: (_, v) => [null, v + 1]
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create();
+
+  graph
+    .dispatch(src, d1)
+    .dispatch(src, d2);
+
+  t.deepEqual(res, []);
+
+  d2.resolve(23);
+  await immediate();
+  t.deepEqual(res, []);
+
+  d1.resolve(21);
+  await immediate();
+  t.deepEqual(res, [22, 24]);
+});
+
+
+function defer() {
+  let resolve;
+  let reject;
+
+  const promise = new Promise((resolveFn, rejectFn) => {
+    resolve = resolveFn;
+    reject = rejectFn;
+  });
+
+  return {
+    resolve,
+    reject,
+    promise
+  };
+}
