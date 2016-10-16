@@ -92,13 +92,15 @@ class Graph {
     this.inputs = inputs;
   }
 
-  dispatch(targetInput, msg) {
+  dispatch(targetInput, msg, done = noop) {
     // note: we intentionally do not return `process`'s result, it could be our
     // thenable implementation rather than a promise, and we shouldn't be
     // exposing this as part of the api. unhandled rejections shouldn't be an
     // issue here, we should be handling rejections in `process`.
+    done = callOnNth(this.inputs.length, done);
+
     for (const [input, node] of this.inputs) {
-      if (input === targetInput) process(node, msg);
+      if (input === targetInput) process(node, msg, done);
     }
 
     return this;
@@ -106,9 +108,13 @@ class Graph {
 }
 
 
-function process(node, msg) {
+function process(node, msg, done) {
   // TODO actual error handling
-  node.schedule(msg, (err, res) => node.child && process(node.child, res));
+  node.schedule(msg, (err, res) => {
+    if (err) unhandledError(err);
+    else if (node.child) process(node.child, res, done);
+    else done();
+  });
 }
 
 
@@ -207,6 +213,15 @@ function unhandledError(e) {
   ].join(''));
 
   console.error(e);
+}
+
+
+function callOnNth(n, fn) {
+  let i = 0;
+
+  return (...args) => {
+    if (++i >= n) fn(...args);
+  };
 }
 
 

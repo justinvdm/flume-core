@@ -3,6 +3,23 @@ import immediate from 'immediate-promise';
 import { input } from '.';
 
 
+function defer() {
+  let resolve;
+  let reject;
+
+  const promise = new Promise((resolveFn, rejectFn) => {
+    resolve = resolveFn;
+    reject = rejectFn;
+  });
+
+  return {
+    resolve,
+    reject,
+    promise
+  };
+}
+
+
 test('value propagation', t => {
   const src = input();
   const res = [];
@@ -144,18 +161,27 @@ test('promise-based transform msg results', async t => {
 });
 
 
-function defer() {
-  let resolve;
-  let reject;
+test('dispatch callback', async t => {
+  const src = input();
+  const resolved = [];
+  const d1 = defer();
+  const d2 = defer();
 
-  const promise = new Promise((resolveFn, rejectFn) => {
-    resolve = resolveFn;
-    reject = rejectFn;
-  });
+  const graph = src
+    .pipe({ transform: (_, d) => d.promise.then(() => [null, null]) })
+    .create();
 
-  return {
-    resolve,
-    reject,
-    promise
-  };
-}
+  graph
+    .dispatch(src, d1, () => { resolved.push(d1); })
+    .dispatch(src, d2, () => { resolved.push(d2); });
+
+  t.deepEqual(resolved, []);
+
+  d2.resolve();
+  await immediate();
+  t.deepEqual(resolved, []);
+
+  d1.resolve();
+  await immediate();
+  t.deepEqual(resolved, [d1, d2]);
+});
