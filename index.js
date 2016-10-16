@@ -1,3 +1,14 @@
+class Msg {
+  constructor(type, value) {
+    this.type = type;
+    this.value = value;
+  }
+}
+
+
+class ValueMsgType {}
+
+
 class NodeDef {
   constructor() {
     this.parents = [];
@@ -29,9 +40,11 @@ class TransformDef extends NodeDef {
   constructor({
     parents,
     transform,
+    type = ValueMsgType,
     init = noop
   }) {
     super();
+    this.msgType = type;
     this.parents = parents;
     this.initFn = init;
     this.transformFn = transform;
@@ -42,7 +55,9 @@ class TransformDef extends NodeDef {
   }
 
   _process(state, msg, i) {
-    return this.transformFn(state, msg, i);
+    return this.msgType === msg.type
+      ? this.transformFn(state, msg.value, i)
+      : [state, msg];
   }
 }
 
@@ -93,10 +108,6 @@ class Graph {
   }
 
   dispatch(targetInput, msg, done = noop) {
-    // note: we intentionally do not return `process`'s result, it could be our
-    // thenable implementation rather than a promise, and we shouldn't be
-    // exposing this as part of the api. unhandled rejections shouldn't be an
-    // issue here, we should be handling rejections in `process`.
     done = callOnNth(this.inputs.length, done);
 
     for (const [input, node] of this.inputs) {
@@ -109,6 +120,8 @@ class Graph {
 
 
 function process(node, msg, i, done) {
+  msg = castMessage(msg);
+
   // TODO actual error handling
   node.schedule(msg, i, (err, res) => {
     if (err) unhandledError(err);
@@ -144,8 +157,20 @@ function transform(...args) {
 }
 
 
+function message(...args) {
+  return new Msg(...args);
+}
+
+
 function noop() {
   return null;
+}
+
+
+function castMessage(v) {
+  return !(v instanceof Msg)
+    ? message(ValueMsgType, v)
+    : v;
 }
 
 
@@ -228,5 +253,6 @@ function callOnNth(n, fn) {
 module.exports = {
   create,
   input,
-  transform
+  transform,
+  message
 };

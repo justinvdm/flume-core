@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { transform, input } from '.';
+import { transform, input, message } from '.';
 
 
 function defer() {
@@ -45,6 +45,35 @@ test('value propagation', t => {
     .dispatch(src, 23);
 
   t.deepEqual(res, [45, 70]);
+});
+
+
+test('message types', t => {
+  const src = input();
+  const res = [];
+
+  const graph = src
+    .pipe({
+      type: 'foo',
+      transform: (_, v) => [null, v * 2]
+    })
+    .pipe({
+      type: 'bar',
+      transform: (_, v) => [null, v + 1]
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create();
+
+  graph
+    .dispatch(src, message('foo', 21))
+    .dispatch(src, message('bar', 23));
+
+  t.deepEqual(res, [42, 24]);
 });
 
 
@@ -304,7 +333,7 @@ test('dispatch callback for multiple inputs of same type', async t => {
 
   const b = src
     .pipe({
-      transform: (_, d) => [null, null]
+      transform: () => [null, null]
     });
 
   const graph = transform({
