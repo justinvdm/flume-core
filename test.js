@@ -423,3 +423,38 @@ test('dispatch callback for multiple inputs of same type', async t => {
   await immediate();
   t.deepEqual(resolved, [d1, d2]);
 });
+
+
+test('ignoring of non-array results', t => {
+  const error = console.error;
+  const src = input();
+  const res = [];
+  const errors = [];
+
+  console.error = e => errors.push(e);
+
+  try {
+    src
+      .pipe({
+        transform: (_, v) => v
+      })
+      .pipe({
+        transform: (_, v) => {
+          res.push(v);
+          return [null, null];
+        }
+      })
+      .create()
+      .dispatch(src, [null, 2])
+      .dispatch(src, 3)
+      .dispatch(src, [null, 23])
+  } finally {
+    console.error = error;
+  }
+
+  t.deepEqual(res, [2, 23]);
+
+  t.deepEqual(errors, [
+    'flume expected array for process result, received number, ignoring: 3'
+  ]);
+});

@@ -1,3 +1,7 @@
+class ValueMsgType {}
+class ErrorMsgType {}
+class NilMsgType {}
+
 class UnhandledError {
   constructor(error) {
     this.error = error;
@@ -11,10 +15,6 @@ class Msg {
     this.value = value;
   }
 }
-
-
-class ValueMsgType {}
-class ErrorMsgType {}
 
 
 class NodeDef {
@@ -85,6 +85,19 @@ class Node {
     else this.process(...task);
   }
 
+  parseProcessResult(res) {
+    if (!Array.isArray(res)) {
+      console.error([
+        `flume expected array for process result, received ${typeof res}, `,
+        `ignoring: ${res}`
+      ].join(''));
+
+      return [this.state, nil];
+    }
+
+    return res;
+  }
+
   processNext() {
     const task = this.queue.shift();
     if (task) this.process(...task);
@@ -93,11 +106,11 @@ class Node {
   process(msg, i, done) {
     this.isBusy = true;
 
-    const success = ([state, res]) => {
-      // TODO validate that an array is returned
-      this.state = state;
+    const success = res => {
+      const [newState, newMsg] = this.parseProcessResult(res);
+      this.state = newState;
       this.isBusy = false;
-      done(null, res);
+      done(null, newMsg);
       this.processNext();
     }
 
@@ -273,11 +286,15 @@ function callOnNth(n, fn) {
 }
 
 
+const nil = message(NilMsgType, null);
+
+
 module.exports = {
   create,
   input,
   transform,
   message,
   except,
-  trap
+  trap,
+  nil
 };
