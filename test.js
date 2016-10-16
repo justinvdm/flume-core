@@ -24,7 +24,7 @@ test('value propagation', t => {
   const src = input();
   const res = [];
 
-  const graph = src
+  src
     .pipe({
       init: () => 2,
       transform: (state, v) => [state + v, state + (v * 2)]
@@ -38,9 +38,7 @@ test('value propagation', t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, 21)
     .dispatch(src, 23);
 
@@ -52,7 +50,7 @@ test('message types', t => {
   const src = input();
   const res = [];
 
-  const graph = src
+  src
     .pipe({
       type: 'foo',
       transform: (_, v) => [null, v * 2]
@@ -67,9 +65,7 @@ test('message types', t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, message('foo', 21))
     .dispatch(src, message('bar', 23));
 
@@ -92,7 +88,7 @@ test('multiple inputs', t => {
       transform: (_, v) => [null, v * 2]
     })
 
-  const graph = transform({
+  transform({
       parents: [a, b],
       transform: (_, v) => [null, v]
     })
@@ -102,9 +98,7 @@ test('multiple inputs', t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src1, 2)
     .dispatch(src2, 3)
     .dispatch(src2, 21)
@@ -128,7 +122,7 @@ test('multiple inputs of same type', t => {
       transform: (_, v) => [null, v * 2]
     })
 
-  const graph = transform({
+  transform({
       parents: [a, b],
       transform: (_, v) => [null, v]
     })
@@ -138,9 +132,7 @@ test('multiple inputs of same type', t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, 2)
     .dispatch(src, 3);
 
@@ -155,7 +147,7 @@ test('parent indices', t => {
   const src2 = input();
   const res = [];
 
-  const graph = transform({
+  transform({
       init: () => 2,
       parents: [src1, src2],
       transform: (state, v, i) => [state + v, state + v + i]
@@ -169,9 +161,7 @@ test('parent indices', t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src1, 2)
     .dispatch(src2, 3)
     .dispatch(src2, 21)
@@ -187,7 +177,7 @@ test('promise-based transform results', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const graph = src
+  src
     .pipe({
       init: () => 2,
       transform: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
@@ -201,9 +191,7 @@ test('promise-based transform results', async t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -225,7 +213,7 @@ test('promise-based transform state results', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const graph = src
+  src
     .pipe({
       init: () => 2,
       transform: (state, d) => [d.promise, state]
@@ -239,9 +227,7 @@ test('promise-based transform state results', async t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -263,7 +249,7 @@ test('promise-based transform msg results', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const graph = src
+  src
     .pipe({
       transform: (_, d) => [null, d.promise]
     })
@@ -276,9 +262,7 @@ test('promise-based transform msg results', async t => {
         return [null, null];
       }
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -300,11 +284,11 @@ test('dispatch callback', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const graph = src
-    .pipe({ transform: (_, d) => d.promise.then(() => [null, null]) })
-    .create();
-
-  graph
+  src
+    .pipe({
+      transform: (_, d) => d.promise.then(() => [null, null])
+    })
+    .create()
     .dispatch(src, d1, () => { resolved.push(d1); })
     .dispatch(src, d2, () => { resolved.push(d2); });
 
@@ -336,13 +320,11 @@ test('dispatch callback for multiple inputs of same type', async t => {
       transform: () => [null, null]
     });
 
-  const graph = transform({
+  transform({
       parents: [a, b],
       transform: (_, v) => [null, v]
     })
-    .create();
-
-  graph
+    .create()
     .dispatch(src, d1, () => { resolved.push(d1); })
     .dispatch(src, d2, () => { resolved.push(d2); });
 
