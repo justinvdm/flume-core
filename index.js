@@ -53,18 +53,36 @@ class Node {
     this.child = child;
     this.parentIndex = parentIndex;
     this.state = this.def._init();
-    this.queue = thenable(null);
+    this.queue = [];
+    this.isBusy = false;
   }
 
-  process(msg) {
-    return this.queue = this.queue
-      .then(() => this.def._process(this.state, msg, this.parentIndex))
+  schedule(msg, done) {
+    if (this.isBusy) this.queue.push([msg, done]);
+    else this.process(msg, done);
+  }
+
+  processNext() {
+    const task = this.queue.shift();
+    if (task) this.process(...task);
+  }
+
+  process(msg, done) {
+    this.isBusy = true;
+
+    const success = ([state, res]) => {
+      // TODO validate that an array is returned
+      this.state = state;
+      this.isBusy = false;
+
+      done(null, res);
+      this.processNext();
+    }
+
+    maybeAsync(() => this.def._process(this.state, msg, this.parentIndex))()
       .then(resolveSync)
-      .then(([newState, newMsg]) => {
-        // TODO validate that an array is returned
-        this.state = newState;
-        return newMsg;
-      });
+      .then(success, done)
+      .then(null, unhandledError);
   }
 }
 
@@ -78,7 +96,7 @@ class Graph {
     // note: we intentionally do not return `process`'s result, it could be our
     // thenable implementation rather than a promise, and we shouldn't be
     // exposing this as part of the api. unhandled rejections shouldn't be an
-    // issue here, provided we handle them appropriately in `process`
+    // issue here, we should be handling rejections in `process`.
     for (const [input, node] of this.inputs) {
       if (input === targetInput) process(node, msg);
     }
@@ -90,8 +108,7 @@ class Graph {
 
 function process(node, msg) {
   // TODO actual error handling
-  return node.process(msg)
-    .then(res => node.child && process(node.child, res));
+  node.schedule(msg, (err, res) => node.child && process(node.child, res));
 }
 
 
@@ -122,6 +139,7 @@ function transform(...args) {
 
 
 function noop() {
+  return null;
 }
 
 
@@ -145,12 +163,12 @@ function thenable(v) {
 
 
 function thenableValue(v) {
-  return {then: maybeAsync(resolveFn => resolveFn(v))};
+  return {then: maybeAsync(success => success(v))};
 }
 
 
 function thenableError(e) {
-  return {then: maybeAsync((_, rejectFn = thrower) => rejectFn(e))};
+  return {then: maybeAsync((_, failure = thrower) => failure(e))};
 }
 
 
@@ -177,6 +195,18 @@ function resolveSync(values) {
   function push(v) {
     res.push(v);
   }
+}
+
+
+function unhandledError(e) {
+  console.error([
+    'An unexpected error occured in flume. Sorry, this is mostly likely a bug ',
+    'in flume. please check the known issues at ',
+    'https://github.com/justinvdm/flume/issues and report the issue if it is ',
+    'not yet reported.'
+  ].join(''));
+
+  console.error(e);
 }
 
 
