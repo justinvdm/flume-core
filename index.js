@@ -153,7 +153,7 @@ function maybeAsync(fn) {
   return (...args) => {
     try {
       const v = fn(...args);
-      return thenable(v);
+      return castThenable(v);
     } catch (e) {
       return thenableError(e);
     }
@@ -161,7 +161,7 @@ function maybeAsync(fn) {
 }
 
 
-function thenable(v) {
+function castThenable(v) {
   return !(v || 0).then
     ? thenableValue(v)
     : v;
@@ -184,18 +184,18 @@ function thrower(e) {
 
 
 function resolveSync(values) {
-  if (!Array.isArray(values)) return thenable(values);
+  if (!Array.isArray(values)) return castThenable(values);
   const res = [];
   const n = values.length;
   let i = -1;
   let j = -1;
-  let p = thenable(null);
+  let p = castThenable(null);
 
   while (++i < n) p = p.then(call);
   return p.then(() => res);
 
   function call() {
-    return thenable(values[++j]).then(push);
+    return castThenable(values[++j]).then(push);
   }
 
   function push(v) {
