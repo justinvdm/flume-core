@@ -57,9 +57,9 @@ class Node {
     this.isBusy = false;
   }
 
-  schedule(msg, done) {
-    if (this.isBusy) this.queue.push([msg, done]);
-    else this.process(msg, done);
+  schedule(...task) {
+    if (this.isBusy) this.queue.push(task);
+    else this.process(...task);
   }
 
   processNext() {
@@ -67,7 +67,7 @@ class Node {
     if (task) this.process(...task);
   }
 
-  process(msg, done) {
+  process(msg, i, done) {
     this.isBusy = true;
 
     const success = ([state, res]) => {
@@ -79,7 +79,7 @@ class Node {
       this.processNext();
     }
 
-    maybeAsync(() => this.def._process(this.state, msg, this.parentIndex))()
+    maybeAsync(() => this.def._process(this.state, msg, i))()
       .then(resolveSync)
       .then(success, done)
       .then(null, unhandledError);
@@ -100,7 +100,7 @@ class Graph {
     done = callOnNth(this.inputs.length, done);
 
     for (const [input, node] of this.inputs) {
-      if (input === targetInput) process(node, msg, done);
+      if (input === targetInput) process(node, msg, 0, done);
     }
 
     return this;
@@ -108,11 +108,11 @@ class Graph {
 }
 
 
-function process(node, msg, done) {
+function process(node, msg, i, done) {
   // TODO actual error handling
-  node.schedule(msg, (err, res) => {
+  node.schedule(msg, i, (err, res) => {
     if (err) unhandledError(err);
-    else if (node.child) process(node.child, res, done);
+    else if (node.child) process(node.child, res, node.parentIndex, done);
     else done();
   });
 }
@@ -124,7 +124,7 @@ function create(tail) {
 
   let node;
 
-  while ((node = stack.pop())) {
+  while ((node = stack.shift())) {
     let i = 0;
     for (const parent of node.def.parents) stack.push(new Node(parent, node, i++));
     if (node.def instanceof InputDef) inputs.push([node.def, node]);
