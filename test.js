@@ -431,20 +431,22 @@ test('ignoring of non-array results', t => {
   const res = [];
   const errors = [];
 
+  const graph = src
+    .pipe({
+      transform: (_, v) => v
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create();
+
   console.error = e => errors.push(e);
 
   try {
-    src
-      .pipe({
-        transform: (_, v) => v
-      })
-      .pipe({
-        transform: (_, v) => {
-          res.push(v);
-          return [null, null];
-        }
-      })
-      .create()
+    graph
       .dispatch(src, [null, 2])
       .dispatch(src, 3)
       .dispatch(src, [null, 23])
