@@ -1,3 +1,10 @@
+class UnhandledError {
+  constructor(error) {
+    this.error = error;
+  }
+}
+
+
 class Msg {
   constructor(type, value) {
     this.type = type;
@@ -7,6 +14,7 @@ class Msg {
 
 
 class ValueMsgType {}
+class ErrorMsgType {}
 
 
 class NodeDef {
@@ -15,7 +23,7 @@ class NodeDef {
   }
 
   pipe(opts) {
-    return transform(Object.assign({parents: [this]}, opts));
+    return transform(conj({parents: [this]}, opts));
   }
 
   create() {
@@ -89,14 +97,19 @@ class Node {
       // TODO validate that an array is returned
       this.state = state;
       this.isBusy = false;
-
       done(null, res);
       this.processNext();
     }
 
+    const failure = e => {
+      this.isBusy = false;
+      done(e);
+      this.processNext();
+    };
+
     maybeAsync(() => this.def._process(this.state, msg, i))()
       .then(resolveSync)
-      .then(success, done)
+      .then(success, failure)
       .then(null, unhandledError);
   }
 }
@@ -122,10 +135,11 @@ class Graph {
 function process(node, msg, i, done) {
   msg = castMessage(msg);
 
-  // TODO actual error handling
-  node.schedule(msg, i, (err, res) => {
-    if (err) unhandledError(err);
-    else if (node.child) process(node.child, res, node.parentIndex, done);
+  node.schedule(msg, i, (err, msg) => {
+    if (err) msg = message(ErrorMsgType, err);
+
+    if (node.child) process(node.child, msg, node.parentIndex, done);
+    else if (err) throw err;
     else done();
   });
 }
@@ -162,6 +176,21 @@ function message(...args) {
 }
 
 
+function except(obj) {
+  return trap(ErrorMsgType, obj);
+}
+
+
+function trap(type, obj) {
+  return conj(obj, {type});
+}
+
+
+function conj(...objects) {
+  return Object.assign({}, ...objects);
+}
+
+
 function noop() {
   return null;
 }
@@ -180,7 +209,8 @@ function maybeAsync(fn) {
       const v = fn(...args);
       return castThenable(v);
     } catch (e) {
-      return thenableError(e);
+      if (e instanceof UnhandledError) throw e.error;
+      else return thenableError(e);
     }
   };
 }
@@ -199,12 +229,17 @@ function thenableValue(v) {
 
 
 function thenableError(e) {
-  return {then: maybeAsync((_, failure = thrower) => failure(e))};
+  return {then: maybeAsync((_, failure = throwError) => failure(e))};
 }
 
 
-function thrower(e) {
+function throwError(e) {
   throw e;
+}
+
+
+function unhandledError(e) {
+  throw new UnhandledError(e);
 }
 
 
@@ -229,18 +264,6 @@ function resolveSync(values) {
 }
 
 
-function unhandledError(e) {
-  console.error([
-    'An unexpected error occured in flume. Sorry, this is mostly likely a bug ',
-    'in flume. please check the known issues at ',
-    'https://github.com/justinvdm/flume/issues and report the issue if it is ',
-    'not yet reported.'
-  ].join(''));
-
-  console.error(e);
-}
-
-
 function callOnNth(n, fn) {
   let i = 0;
 
@@ -254,5 +277,7 @@ module.exports = {
   create,
   input,
   transform,
-  message
+  message,
+  except,
+  trap
 };

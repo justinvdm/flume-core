@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { transform, input, message } from '.';
+import { transform, input, message, trap, except } from '.';
 
 
 function defer() {
@@ -46,19 +46,65 @@ test('value propagation', t => {
 });
 
 
-test('message types', t => {
+test('error propagation', t => {
   const src = input();
   const res = [];
 
   src
     .pipe({
-      type: 'foo',
-      transform: (_, v) => [null, v * 2]
+      transform: (_, v) => {
+        throw new Error(v);
+      }
     })
     .pipe({
-      type: 'bar',
-      transform: (_, v) => [null, v + 1]
+      transform: () => {
+        t.fail('this node should not process anything');
+      }
     })
+    .pipe(except({
+      transform: (_, e) => [null, e.message]
+    }))
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create()
+    .dispatch(src, 'o_O')
+    .dispatch(src, ':/');
+
+  t.deepEqual(res, ['o_O', ':/']);
+});
+
+
+test('unhandled errors', t => {
+  const src = input();
+
+  const fn = () => src
+    .pipe({
+      transform: (_, v) => {
+        throw new Error(v);
+      }
+    })
+    .create()
+    .dispatch(src, 'o_O')
+
+  t.throws(fn, 'o_O');
+});
+
+
+test('message types', t => {
+  const src = input();
+  const res = [];
+
+  src
+    .pipe(trap('foo', {
+      transform: (_, v) => [null, v * 2]
+    }))
+    .pipe(trap('bar', {
+      transform: (_, v) => [null, v + 1]
+    }))
     .pipe({
       transform: (_, v) => {
         res.push(v);
@@ -138,8 +184,6 @@ test('multiple inputs of same type', t => {
 
   t.deepEqual(res, [3, 4, 4, 6]);
 });
-
-
 
 
 test('parent indices', t => {
@@ -275,6 +319,47 @@ test('promise-based transform msg results', async t => {
   d1.resolve(21);
   await immediate();
   t.deepEqual(res, [22, 24]);
+});
+
+
+test('promise rejection', async t => {
+  const src = input();
+  const res = [];
+  const d1 = defer();
+  const d2 = defer();
+
+  src
+    .pipe({
+      transform: (_, d) => d.promise.then(v => Promise.reject(new Error(v)))
+    })
+    .pipe({
+      transform: () => {
+        t.fail('this node should not process anything');
+      }
+    })
+    .pipe(except({
+      transform: (_, e) => [null, e.message]
+    }))
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create()
+    .dispatch(src, d1)
+    .dispatch(src, d2);
+
+  t.deepEqual(res, []);
+
+  d2.resolve(':/');
+  await immediate();
+  t.deepEqual(res, []);
+
+  d1.resolve('o_O');
+  await immediate();
+
+  t.deepEqual(res, ['o_O', ':/']);
 });
 
 
