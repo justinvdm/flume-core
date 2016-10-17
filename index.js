@@ -17,6 +17,13 @@ class Msg {
 }
 
 
+class Batch {
+  constructor(messages) {
+    this.messages = messages;
+  }
+}
+
+
 class NodeDef {
   constructor() {
     this.parents = [];
@@ -145,16 +152,17 @@ class Graph {
 }
 
 
-function process(node, msg, i, done) {
-  msg = castMessage(msg);
+function process(node, msgs, i, end) {
+  msgs = castBatch(msgs).messages;
+  end = callOnNth(msgs.length, end);
+  msgs.forEach(msg => node.schedule(msg, i, done));
 
-  node.schedule(msg, i, (err, msg) => {
-    if (err) msg = message(ErrorMsgType, err);
-
-    if (node.child) process(node.child, msg, node.parentIndex, done);
+  function done(err, res) {
+    if (err) res = message(ErrorMsgType, err);
+    if (node.child) process(node.child, res, node.parentIndex, end);
     else if (err) throw err;
-    else done();
-  });
+    else end();
+  }
 }
 
 
@@ -189,6 +197,11 @@ function message(...args) {
 }
 
 
+function batch(values) {
+  return new Batch(values.map(castMessage));
+}
+
+
 function except(obj) {
   return trap(ErrorMsgType, obj);
 }
@@ -206,6 +219,13 @@ function conj(...objects) {
 
 function noop() {
   return null;
+}
+
+
+function castBatch(v) {
+  return !(v instanceof Batch)
+    ? batch([v])
+    : v;
 }
 
 
@@ -294,6 +314,7 @@ module.exports = {
   input,
   transform,
   message,
+  batch,
   except,
   trap,
   nil

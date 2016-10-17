@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { transform, input, message, trap, except } from '.';
+import { transform, input, message, trap, except, batch } from '.';
 
 
 function defer() {
@@ -459,4 +459,29 @@ test('ignoring of non-array results', t => {
   t.deepEqual(errors, [
     'flume expected array for process result, received number, ignoring: 3'
   ]);
+});
+
+
+test('batching', t => {
+  const src = input();
+  const res = [];
+
+  src
+    .pipe({
+      transform: (_, v) => [null, batch([v, v * 2])]
+    })
+    .pipe({
+      transform: (_, v) => [null, batch([v * 3, v * 4])]
+    })
+    .pipe({
+      transform: (_, v) => {
+        res.push(v);
+        return [null, null];
+      }
+    })
+    .create()
+    .dispatch(src, 2)
+    .dispatch(src, 3);
+
+  t.deepEqual(res, [6, 8, 12, 16, 9, 12, 18, 24]);
 });
