@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { transform, input, message, trap, except, batch } from '.';
+import { input, message, trap, except, batch, create } from '.';
 
 
 function defer() {
@@ -20,25 +20,24 @@ function defer() {
 }
 
 
+function capture(arr) {
+  return (_, v) => arr.push(v);
+}
+
+
 test('value propagation', t => {
   const src = input();
   const res = [];
 
-  src
-    .pipe({
+  const graph = [src]
+    .concat({
       init: () => 2,
-      transform: (state, v) => [state + v, state + (v * 2)]
+      process: (state, v) => [state + v, state + (v * 2)]
     })
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat((_, v) => [null, v + 1])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, 21)
     .dispatch(src, 23);
 
@@ -50,27 +49,17 @@ test('error propagation', t => {
   const src = input();
   const res = [];
 
-  src
-    .pipe({
-      transform: (_, v) => {
-        throw new Error(v);
-      }
+  const graph = [src]
+    .concat((_, v) => {
+      throw new Error(v);
     })
-    .pipe({
-      transform: () => {
-        t.fail('this node should not process anything');
-      }
+    .concat(() => {
+      t.fail('this node should not process anything');
     })
-    .pipe(except({
-      transform: (_, e) => [null, e.message]
-    }))
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat(except((_, e) => [null, e.message]))
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, 'o_O')
     .dispatch(src, ':/');
 
@@ -81,14 +70,12 @@ test('error propagation', t => {
 test('unhandled errors', t => {
   const src = input();
 
-  const fn = () => src
-    .pipe({
-      transform: (_, v) => {
-        throw new Error(v);
-      }
-    })
-    .create()
-    .dispatch(src, 'o_O')
+  const graph = [src]
+    .concat((_, v) => {
+      throw new Error(v);
+    });
+
+  const fn = () => create(graph).dispatch(src, 'o_O');
 
   t.throws(fn, 'o_O');
 });
@@ -98,20 +85,12 @@ test('message types', t => {
   const src = input();
   const res = [];
 
-  src
-    .pipe(trap('foo', {
-      transform: (_, v) => [null, v * 2]
-    }))
-    .pipe(trap('bar', {
-      transform: (_, v) => [null, v + 1]
-    }))
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+  const graph = [src]
+    .concat(trap('foo', (_, v) => [null, v * 2]))
+    .concat(trap('bar', (_, v) => [null, v + 1]))
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, message('foo', 21))
     .dispatch(src, message('bar', 23));
 
@@ -124,27 +103,14 @@ test('multiple inputs', t => {
   const src2 = input();
   const res = [];
 
-  const a = src1
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
+  const a = [src1, (_, v) => [null, v + 1]];
+  const b = [src2, (_, v) => [null, v * 2]];
 
-  const b = src2
-    .pipe({
-      transform: (_, v) => [null, v * 2]
-    })
+  const graph = [[a, b]]
+    .concat((_, v) => [null, v])
+    .concat(capture(res));
 
-  transform({
-      parents: [a, b],
-      transform: (_, v) => [null, v]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+  create(graph)
     .dispatch(src1, 2)
     .dispatch(src2, 3)
     .dispatch(src2, 21)
@@ -158,27 +124,17 @@ test('multiple inputs of same type', t => {
   const src = input();
   const res = [];
 
-  const a = src
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
+  const a = [src]
+    .concat((_, v) => [null, v + 1]);
 
-  const b = src
-    .pipe({
-      transform: (_, v) => [null, v * 2]
-    })
+  const b = [src]
+    .concat((_, v) => [null, v * 2]);
 
-  transform({
-      parents: [a, b],
-      transform: (_, v) => [null, v]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+  const graph = [[a, b]]
+    .concat((_, v) => [null, v])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, 2)
     .dispatch(src, 3);
 
@@ -191,21 +147,15 @@ test('parent indices', t => {
   const src2 = input();
   const res = [];
 
-  transform({
+  const graph = [[src1, src2]]
+    .concat({
       init: () => 2,
-      parents: [src1, src2],
-      transform: (state, v, i) => [state + v, state + v + i]
+      process: (state, v, i) => [state + v, state + v + i]
     })
-    .pipe({
-      transform: (_, v) => [null, v * 2]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat((_, v) => [null, v * 2])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src1, 2)
     .dispatch(src2, 3)
     .dispatch(src2, 21)
@@ -215,27 +165,21 @@ test('parent indices', t => {
 });
 
 
-test('promise-based transform results', async t => {
+test('promise-based process results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
   const d2 = defer();
 
-  src
-    .pipe({
+  const graph = [src]
+    .concat({
       init: () => 2,
-      transform: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
+      process: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
     })
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat((_, v) => [null, v + 1])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -251,27 +195,21 @@ test('promise-based transform results', async t => {
 });
 
 
-test('promise-based transform state results', async t => {
+test('promise-based process state results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
   const d2 = defer();
 
-  src
-    .pipe({
+  const graph = [src]
+    .concat({
       init: () => 2,
-      transform: (state, d) => [d.promise, state]
+      process: (state, d) => [d.promise, state]
     })
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat((_, v) => [null, v + 1])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -287,26 +225,18 @@ test('promise-based transform state results', async t => {
 });
 
 
-test('promise-based transform msg results', async t => {
+test('promise-based process msg results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
   const d2 = defer();
 
-  src
-    .pipe({
-      transform: (_, d) => [null, d.promise]
-    })
-    .pipe({
-      transform: (_, v) => [null, v + 1]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+  const graph = [src]
+    .concat((_, d) => [null, d.promise])
+    .concat((_, v) => [null, v + 1])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -328,25 +258,15 @@ test('promise rejection', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  src
-    .pipe({
-      transform: (_, d) => d.promise.then(v => Promise.reject(new Error(v)))
+  const graph = [src]
+    .concat((_, d) => d.promise.then(v => Promise.reject(new Error(v))))
+    .concat(() => {
+      t.fail('this node should not process anything');
     })
-    .pipe({
-      transform: () => {
-        t.fail('this node should not process anything');
-      }
-    })
-    .pipe(except({
-      transform: (_, e) => [null, e.message]
-    }))
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+    .concat(except((_, e) => [null, e.message]))
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, d1)
     .dispatch(src, d2);
 
@@ -369,13 +289,12 @@ test('dispatch callback', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  src
-    .pipe({
-      transform: (_, d) => d.promise.then(() => [null, null])
-    })
-    .create()
-    .dispatch(src, d1, () => { resolved.push(d1); })
-    .dispatch(src, d2, () => { resolved.push(d2); });
+  const graph = [src]
+    .concat((_, d) => d.promise.then(() => [null, null]));
+
+  create(graph)
+    .dispatch(src, d1, () => resolved.push(d1))
+    .dispatch(src, d2, () => resolved.push(d2));
 
   t.deepEqual(resolved, []);
 
@@ -395,23 +314,18 @@ test('dispatch callback for multiple inputs of same type', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const a = src
-    .pipe({
-      transform: (_, d) => d.promise.then(() => [null, null])
-    });
+  const a = [src]
+    .concat((_, d) => d.promise.then(() => [null, null]))
 
-  const b = src
-    .pipe({
-      transform: () => [null, null]
-    });
+  const b = [src]
+    .concat(() => [null, null])
 
-  transform({
-      parents: [a, b],
-      transform: (_, v) => [null, v]
-    })
-    .create()
-    .dispatch(src, d1, () => { resolved.push(d1); })
-    .dispatch(src, d2, () => { resolved.push(d2); });
+  const graph = [[a, b]]
+    .concat((_, v) => [null, v]);
+
+  create(graph)
+    .dispatch(src, d1, () => resolved.push(d1))
+    .dispatch(src, d2, () => resolved.push(d2));
 
   t.deepEqual(resolved, []);
 
@@ -425,61 +339,16 @@ test('dispatch callback for multiple inputs of same type', async t => {
 });
 
 
-test('ignoring of non-array results', t => {
-  const error = console.error;
-  const src = input();
-  const res = [];
-  const errors = [];
-
-  const graph = src
-    .pipe({
-      transform: (_, v) => v
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create();
-
-  console.error = e => errors.push(e);
-
-  try {
-    graph
-      .dispatch(src, [null, 2])
-      .dispatch(src, 3)
-      .dispatch(src, [null, 23])
-  } finally {
-    console.error = error;
-  }
-
-  t.deepEqual(res, [2, 23]);
-
-  t.deepEqual(errors, [
-    'flume expected array for process result, received number, ignoring: 3'
-  ]);
-});
-
-
 test('batching', t => {
   const src = input();
   const res = [];
 
-  src
-    .pipe({
-      transform: (_, v) => [null, batch([v, v * 2])]
-    })
-    .pipe({
-      transform: (_, v) => [null, batch([v * 3, v * 4])]
-    })
-    .pipe({
-      transform: (_, v) => {
-        res.push(v);
-        return [null, null];
-      }
-    })
-    .create()
+  const graph = [src]
+    .concat((_, v) => [null, batch([v, v * 2])])
+    .concat((_, v) => [null, batch([v * 3, v * 4])])
+    .concat(capture(res));
+
+  create(graph)
     .dispatch(src, 2)
     .dispatch(src, 3);
 
