@@ -89,11 +89,6 @@ function Node(def, child, index) {
 }
 
 
-function UnhandledError(error) {
-  this.error = error;
-}
-
-
 // graph building
 
 function buildGraph(defs, child, index) {
@@ -151,13 +146,11 @@ function createInputHandler(node) {
 function createProcessorHandler(node) {
   var queue = [];
   var isBusy = false;
-  var state = node.def.init();
   var task = null;
+  var state = node.def.init();
+  var processAsync = maybeAsync(process);
 
-  var processFnAsync = maybeAsync(processFn);
-  return handle;
-
-  function handle(msgs, parent, end) {
+  return function handle(msgs, parent, end) {
     msgs = castBatch(msgs).messages;
 
     var i = -1;
@@ -174,28 +167,29 @@ function createProcessorHandler(node) {
       parent: parent,
       end: end
     });
-  }
+  };
 
   function schedule(task) {
     queue.push(task);
-    if (!isBusy) processNext();
+    if (!isBusy) next();
   }
 
-  function processNext() {
+  function next() {
     task = queue.shift();
-    if (task) process();
+    if (task) run();
+  }
+
+  function run() {
+    isBusy = true;
+
+    return processAsync()
+      .then(resolveSeq)
+      .then(success, failure)
+      .then(done)
+      .then(null, throwUnhandled);
   }
 
   function process() {
-    isBusy = true;
-
-    return processFnAsync()
-      .then(resolveSync)
-      .then(success, failure)
-      .then(done);
-  }
-
-  function processFn() {
     return node.def.type === task.msg.type
       ? node.def.process(state, task.msg.value, task.parent.index)
       : [state, task.msg];
@@ -203,24 +197,27 @@ function createProcessorHandler(node) {
 
   function done(msgs) {
     var end = task.end;
+
     isBusy = false;
     task = null;
-    processNext();
+    next();
+
     if (node.child) node.child.handle(msgs, node, end);
     else end();
   }
 
   function success(res) {
-    res = !Array.isArray(res)
-      ? [state, nil]
-      : res;
-
-    state = res[0];
-    return res[1];
+    if (Array.isArray(res)) {
+      state = res[0];
+      return res[1];
+    }
+    else {
+      return nil;
+    }
   }
 
   function failure(e) {
-    if (!node.child) throw new UnhandledError(e);
+    if (!node.child) throw e;
     return message(ErrorMsgType, e);
   }
 }
@@ -305,11 +302,8 @@ function callOnNth(n, fn) {
 }
 
 
-
 function maybeAsync(fn) {
-  return maybeAsyncFn;
-
-  function maybeAsyncFn() {
+  return function maybeAsyncFn() {
     try {
       var v = fn.apply(this, arguments);
       return castThenable(v);
@@ -338,14 +332,14 @@ function thenableError(e) {
 }
 
 
-function resolveSync(values) {
+function resolveSeq(values) {
   return Array.isArray(values) && values.filter(isThenable).length > 0
-    ? resolveThenablesSync(values)
+    ? resolveThenablesSeq(values)
     : castThenable(values);
 }
 
 
-function resolveThenablesSync(values) {
+function resolveThenablesSeq(values) {
   var res = [];
   var n = values.length;
   var i = -1;
@@ -374,6 +368,17 @@ function isThenable(v) {
 }
 
 
+function throwUnhandled(e) {
+  if (this instanceof Thenable) throw new UnhandledError(e);
+  else throw e;
+}
+
+
+function UnhandledError(error) {
+  this.error = error;
+}
+
+
 function Thenable(value, isFailure) {
   this.value = value;
   this.isFailure = isFailure;
@@ -381,10 +386,8 @@ function Thenable(value, isFailure) {
 
 
 Thenable.prototype.then = maybeAsync(function then(successFn, failureFn) {
-  successFn = successFn || identity;
-  failureFn = failureFn || throwError;
-  if (this.isFailure) return failureFn(this.value);
-  else return successFn(this.value);
+  if (this.isFailure) return (failureFn || throwError).call(this, this.value);
+  else return (successFn || identity).call(this, this.value);
 });
 
 
