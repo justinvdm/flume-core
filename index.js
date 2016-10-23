@@ -26,7 +26,7 @@ function create(defs) {
       if (node.def === def) node.handle(msgs, done);
     }
 
-    return this;
+    return self;
   }
 }
 
