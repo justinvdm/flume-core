@@ -289,7 +289,7 @@ test('dispatch callback', async t => {
   const d1 = defer();
   const d2 = defer();
 
-  const graph = [src]
+  const graph = [[input(), src]]
     .concat((_, d) => d.promise.then(() => [null, null]));
 
   create(graph)

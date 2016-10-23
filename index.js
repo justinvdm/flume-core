@@ -14,17 +14,12 @@ function create(defs) {
   return self;
 
   function dispatch(def, msgs, done) {
-    done = done || noop;
-    done = callOnNth(inputs.length, done);
-
-    var n = inputs.length;
+    var nodes = inputsOf(inputs, def);
+    var n = nodes.length;
     var i = -1;
-    var node;
 
-    while (++i < n) {
-      node = inputs[i];
-      if (node.def === def) node.handle(msgs, done);
-    }
+    done = callOnNth(n, done || noop);
+    while (++i < n) nodes[i].handle(msgs, done);
 
     return self;
   }
@@ -224,6 +219,21 @@ function createProcessorHandler(node) {
 
 
 // utils
+
+
+function inputsOf(inputs, def) {
+  var res = [];
+  var n = inputs.length;
+  var i = -1;
+  var input;
+
+  while (++i < n) {
+    input = inputs[i];
+    if (input.def === def) res.push(input);
+  }
+
+  return res;
+}
 
 
 function conj() {
