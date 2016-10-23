@@ -395,3 +395,22 @@ test('invalid processors', t => {
     () => create([src, input()]),
     "Expected function or object with 'process' function property but got object");
 });
+
+
+test('dispatch access for processors', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat((state, v, i, {dispatch}) => {
+      if (v > 0) dispatch(src, v - 1);
+      return [state, v + 1];
+    })
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, 2)
+    .dispatch(src, 3);
+
+  t.deepEqual(res, [3, 2, 1, 4, 3, 2, 1]);
+});

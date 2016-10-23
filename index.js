@@ -9,17 +9,14 @@ function input() {
 
 
 function create(defs) {
-  var inputs = buildGraph(defs);
-
-  var self = {
-    inputs: inputs,
-    dispatch: dispatch
-  };
+  var self = {};
+  self.dispatch = dispatch;
+  self.inputs = buildGraph(self, defs);
 
   return self;
 
   function dispatch(def, msgs, done) {
-    var nodes = inputsOf(inputs, def);
+    var nodes = inputsOf(self.inputs, def);
     var n = nodes.length;
     var i = -1;
 
@@ -81,7 +78,8 @@ function ProcessorDef(opts) {
 }
 
 
-function Node(def, child, index) {
+function Node(graph, def, child, index) {
+  this.graph = graph;
   this.def = def;
   this.child = child;
   this.index = index;
@@ -91,19 +89,19 @@ function Node(def, child, index) {
 
 // graph building
 
-function buildGraph(defs, child, index) {
+function buildGraph(graph, defs, child, index) {
   var i = defs.length - 1;
   if (i < 0) return [];
 
   // tail
-  if (i) child = new Node(new ProcessorDef(defs[i]), child, index);
-  while (--i > 0) child = new Node(new ProcessorDef(defs[i]), child, 0);
+  if (i) child = new Node(graph, new ProcessorDef(defs[i]), child, index);
+  while (--i > 0) child = new Node(graph, new ProcessorDef(defs[i]), child, 0);
 
-  return buildGraphHead(defs[0], child);
+  return buildGraphHead(graph, defs[0], child);
 }
 
 
-function buildGraphHead(defs, child) {
+function buildGraphHead(graph, defs, child) {
   defs = castArray(defs);
 
   var inputs = [];
@@ -115,9 +113,9 @@ function buildGraphHead(defs, child) {
     def = defs[i];
 
     if (Array.isArray(def)) {
-      inputs.push.apply(inputs, buildGraph(def, child, i));
+      inputs.push.apply(inputs, buildGraph(graph, def, child, i));
     } else if (def instanceof InputDef) {
-      inputs.push(new Node(def, child, i));
+      inputs.push(new Node(graph, def, child, i));
     } else {
       throw new Error("Expected input or array but got " + typeOf(def));
     }
@@ -190,7 +188,7 @@ function createProcessorHandler(node) {
 
   function process() {
     return node.def.type === task.msg.type
-      ? node.def.process(state, task.msg.value, task.parent.index)
+      ? node.def.process(state, task.msg.value, task.parent.index, node.graph)
       : [state, task.msg];
   }
 
@@ -199,10 +197,11 @@ function createProcessorHandler(node) {
 
     isBusy = false;
     task = null;
-    next();
 
     if (node.child) node.child.handle(msgs, node, end);
     else end();
+
+    next();
   }
 
   function success(res) {
