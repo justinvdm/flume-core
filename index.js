@@ -429,6 +429,9 @@
     batch: batch,
     except: except,
     trap: trap,
-    nil: nil
+    nil: nil,
+    conj: conj,
+    maybeAsync: maybeAsync,
+    resolveSeq: resolveSeq
   };
 });
