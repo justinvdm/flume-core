@@ -6,7 +6,6 @@
   "repository": "justinvdm/flume-core",
   "author": {
     "name": "justinvdm",
-    "email": "justinvdm.0.1.0@gmail.com",
     "url": "justinvdm.github.io"
   },
   "engines": {
@@ -21,7 +20,10 @@
     "index.js"
   ],
   "keywords": [
-    ""
+    "dataflow",
+    "reactive",
+    "frp",
+    "flux"
   ],
   "dependencies": {},
   "devDependencies": {
