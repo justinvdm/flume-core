@@ -1,3 +1,5 @@
-# flume [![Build Status](https://travis-ci.org/justinvdm/flume.svg?branch=master)](https://travis-ci.org/justinvdm/flume)
+# flume-core
 
-> an experiment about data flow
+[![Build Status](https://travis-ci.org/justinvdm/flume-core.svg?branch=master)](https://travis-ci.org/justinvdm/flume-core)
+
+> core library for [flume](https://github.com/justinvdm/flume)

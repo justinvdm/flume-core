@@ -1,9 +1,9 @@
 {
-  "name": "flume",
+  "name": "flume-core",
   "version": "0.0.0",
-  "description": "an experiment about data flow",
+  "description": "core library for flume",
   "license": "MIT",
-  "repository": "justinvdm/flume",
+  "repository": "justinvdm/flume-core",
   "author": {
     "name": "justinvdm",
     "email": "justinvdm.0.1.0@gmail.com",
