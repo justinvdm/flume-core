@@ -10,7 +10,12 @@ function input() {
 
 function create(defs) {
   var inputs = buildGraph(defs);
-  var self = {dispatch: dispatch};
+
+  var self = {
+    inputs: inputs,
+    dispatch: dispatch
+  };
+
   return self;
 
   function dispatch(def, msgs, done) {
@@ -87,12 +92,12 @@ function Node(def, child, index) {
 // graph building
 
 function buildGraph(defs, child, index) {
-  // TODO validate not empty
   var i = defs.length - 1;
+  if (i < 0) return [];
 
   // tail
   if (i) child = new Node(new ProcessorDef(defs[i]), child, index);
-  while (--i) child = new Node(new ProcessorDef(defs[i]), child, 0);
+  while (--i > 0) child = new Node(new ProcessorDef(defs[i]), child, 0);
 
   return buildGraphHead(defs[0], child);
 }
@@ -110,12 +115,11 @@ function buildGraphHead(defs, child) {
     def = defs[i];
 
     if (Array.isArray(def)) {
-      // TODO check for empty array
       inputs.push.apply(inputs, buildGraph(def, child, i));
     } else if (def instanceof InputDef) {
       inputs.push(new Node(def, child, i));
     } else {
-      // TODO throw error
+      throw new Error("Expected input or array but got " + typeOf(def));
     }
   }
 
@@ -297,9 +301,19 @@ function castArray(v) {
 
 
 function castProcessorShape(v) {
+  if (typeof v != 'function' && (typeof (v || 0).process != 'function')) throw new Error(
+    "Expected function or object with 'process' function property but got " + typeOf(v));
+
   return typeof v === 'function'
     ? {process: v}
     : v;
+}
+
+
+function typeOf(v) {
+  return v !== null
+    ? typeof v
+    : 'null';
 }
 
 

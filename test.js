@@ -354,3 +354,44 @@ test('batching', t => {
 
   t.deepEqual(res, [6, 8, 12, 16, 9, 12, 18, 24]);
 });
+
+
+test('empty subgraphs', t => {
+  t.deepEqual(create([[[[]]]]).inputs, []);
+});
+
+
+test('graph with inputs only', t => {
+  const src = input();
+  const graph = create([[[[src]]]]);
+  const [{def}] = graph.inputs;
+
+  t.is(graph.inputs.length, 1);
+  t.is(src, def);
+});
+
+
+test('invalid inputs', t => {
+  t.throws(() => create([[23]]), "Expected input or array but got number");
+});
+
+
+test('invalid processors', t => {
+  const src = input();
+
+  t.throws(
+    () => create([src, 23]),
+    "Expected function or object with 'process' function property but got number");
+
+  t.throws(
+    () => create([src, {}]),
+    "Expected function or object with 'process' function property but got object");
+
+  t.throws(
+    () => create([src, null]),
+    "Expected function or object with 'process' function property but got null");
+
+  t.throws(
+    () => create([src, input()]),
+    "Expected function or object with 'process' function property but got object");
+});
