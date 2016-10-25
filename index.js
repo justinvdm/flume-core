@@ -1,11 +1,8 @@
 ;(function(root, factory) {
-  if (typeof root.define === 'function' && root.define.amd)
-    root.define(factory);
-  else if (typeof exports === 'object')
-    module.exports = factory(require, exports, module);
-  else
-    root.flume = factory();
-})(this, function() {
+  if (typeof root.define === 'function' && root.define.amd) root.define(factory);
+  else if (typeof exports === 'object') factory(true);
+  else root.flume = factory();
+})(this, function(cjs) {
   // api
 
   var nil = message(NilMsgType, null);
@@ -421,17 +418,30 @@
     else return (successFn || identity).call(this, this.value);
   });
 
-
-  return {
-    create: create,
-    input: input,
-    message: message,
-    batch: batch,
-    except: except,
-    trap: trap,
-    nil: nil,
-    conj: conj,
-    maybeAsync: maybeAsync,
-    resolveSeq: resolveSeq
-  };
+  if (cjs)
+    module.exports = {
+      create: create,
+      input: input,
+      message: message,
+      batch: batch,
+      except: except,
+      trap: trap,
+      nil: nil,
+      conj: conj,
+      maybeAsync: maybeAsync,
+      resolveSeq: resolveSeq
+    }
+  else
+    return {
+      create: create,
+      input: input,
+      message: message,
+      batch: batch,
+      except: except,
+      trap: trap,
+      nil: nil,
+      conj: conj,
+      maybeAsync: maybeAsync,
+      resolveSeq: resolveSeq
+    };
 });
