@@ -4,6 +4,7 @@
   "description": "core library for flume",
   "license": "MIT",
   "repository": "justinvdm/flume-core",
+  "main": "flume-core.js",
   "author": {
     "name": "justinvdm",
     "url": "justinvdm.github.io"
