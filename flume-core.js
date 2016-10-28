@@ -72,11 +72,13 @@
 
 
   function InputDef() {
+    this.defType = 'input';
   }
 
 
   function ProcessorDef(opts) {
     opts = castProcessorShape(opts);
+    this.defType = 'processor';
     this.type = ensure(opts.type, ValueMsgType);
     this.init = ensure(opts.init, noop);
     this.process = opts.process;
@@ -132,9 +134,9 @@
 
   function createHandler(node) {
     return {
-      InputDef: createInputHandler,
-      ProcessorDef: createProcessorHandler
-    }[node.def.constructor.name](node);
+      input: createInputHandler,
+      processor: createProcessorHandler
+    }[node.def.defType](node);
   }
 
 
