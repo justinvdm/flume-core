@@ -307,8 +307,10 @@
 
 
   function castProcessorShape(v) {
-    if (typeof v != 'function' && (typeof (v || 0).process != 'function')) throw new Error(
-      "Expected function or object with 'process' function property but got " + typeOf(v));
+    if (typeof v != 'function' && (typeof (v || 0).process != 'function'))
+      throw new Error(
+        "Expected function or object with 'process' function property but got "
+        + typeOf(v));
 
     return typeof v === 'function'
       ? {process: v}
@@ -419,6 +421,7 @@
     if (this.isFailure) return (failureFn || throwError).call(this, this.value);
     else return (successFn || identity).call(this, this.value);
   });
+
 
   if (cjs)
     module.exports = {
