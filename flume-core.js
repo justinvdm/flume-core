@@ -5,7 +5,7 @@
 })(this, function(cjs) {
   // api
 
-  var nil = message(NilMsgType, null);
+  var nil = message('flume:nil', null);
 
 
   function input() {
@@ -43,22 +43,17 @@
   }
 
 
-  function except(obj) {
-    return trap(ErrorMsgType, obj);
-  }
-
-
-  function trap(type, obj) {
-    return conj(castProcessorShape(obj), {type: type});
+  function except(fn) {
+    return {
+      process: {
+        'flume:error': fn,
+        '*': exceptFallbackMsgHandler
+      }
+    };
   }
 
 
   // types
-
-  function ValueMsgType() {}
-  function ErrorMsgType() {}
-  function NilMsgType() {}
-
 
   function Msg(type, value) {
     this.type = type;
@@ -77,9 +72,7 @@
 
 
   function ProcessorDef(opts) {
-    opts = castProcessorShape(opts);
     this.defType = 'processor';
-    this.type = ensure(opts.type, ValueMsgType);
     this.init = ensure(opts.init, noop);
     this.process = opts.process;
   }
@@ -101,8 +94,8 @@
     if (i < 0) return [];
 
     // tail
-    if (i) child = new Node(graph, new ProcessorDef(defs[i]), child, index);
-    while (--i > 0) child = new Node(graph, new ProcessorDef(defs[i]), child, 0);
+    if (i) child = new Node(graph, createProcessorDef(defs[i]), child, index);
+    while (--i > 0) child = new Node(graph, createProcessorDef(defs[i]), child, 0);
 
     return buildGraphHead(graph, defs[0], child);
   }
@@ -129,6 +122,34 @@
     }
 
     return inputs;
+  }
+
+
+  function createProcessorDef(obj) {
+    if (typeof obj === 'function') {
+      obj = {
+        process: {'flume:value': obj}
+      };
+    }
+    else if (typeof (obj || 0).process === 'function') {
+      obj = conj(obj, {
+        process: {'flume:value': obj.process}
+      });
+    }
+    else if (typeOf((obj || 0).process) !== 'object') {
+      throw new Error(
+        "Expected function or object matching processor shape but got " +
+        typeOf(obj));
+    }
+
+    return new ProcessorDef(obj);
+  }
+
+
+  // message processing
+
+  function exceptFallbackMsgHandler(state, v) {
+    return [v];
   }
 
 
@@ -194,9 +215,10 @@
     }
 
     function process() {
-      var parent = task.parent;
-      return node.def.type === task.msg.type
-        ? node.def.process(state, task.msg.value, parent.def, node.graph)
+      var fns = node.def.process;
+      var fn = fns[task.msg.type] || fns['*'];
+      return fn
+        ? fn(state, task.msg.value, task.parent.def, node.graph)
         : [state, task.msg];
     }
 
@@ -230,13 +252,12 @@
 
     function failure(e) {
       if (!node.child) throw e;
-      return message(ErrorMsgType, e);
+      return message('flume:error', e);
     }
   }
 
 
   // utils
-
 
   function inputsOf(inputs, def) {
     var res = [];
@@ -301,7 +322,7 @@
 
   function castMessage(v) {
     return !(v instanceof Msg)
-      ? message(ValueMsgType, v)
+      ? message('flume:value', v)
       : v;
   }
 
@@ -309,18 +330,6 @@
   function castArray(v) {
     return !Array.isArray(v)
       ? [v]
-      : v;
-  }
-
-
-  function castProcessorShape(v) {
-    if (typeof v != 'function' && (typeof (v || 0).process != 'function'))
-      throw new Error(
-        "Expected function or object with 'process' function property but got "
-        + typeOf(v));
-
-    return typeof v === 'function'
-      ? {process: v}
       : v;
   }
 
@@ -437,7 +446,6 @@
       message: message,
       batch: batch,
       except: except,
-      trap: trap,
       nil: nil,
       conj: conj,
       maybeAsync: maybeAsync,
@@ -450,7 +458,6 @@
       message: message,
       batch: batch,
       except: except,
-      trap: trap,
       nil: nil,
       conj: conj,
       maybeAsync: maybeAsync,

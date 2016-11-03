@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { input, message, trap, except, batch, create } from '.';
+import { input, message, except, batch, create } from '.';
 
 
 function defer() {
@@ -67,6 +67,27 @@ test('error propagation', t => {
 });
 
 
+test('except fallback handler', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat((_, v) => {
+      if (v % 2) throw new Error(v);
+      return [null, v];
+    })
+    .concat(except((state, e) => [state + +e.message]))
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, 2)
+    .dispatch(src, 5)
+    .dispatch(src, 8);
+
+  t.deepEqual(res, [2, 7, 8]);
+});
+
+
 test('unhandled errors', t => {
   const src = input();
 
@@ -86,8 +107,12 @@ test('message types', t => {
   const res = [];
 
   const graph = [src]
-    .concat(trap('foo', (_, v) => [null, v * 2]))
-    .concat(trap('bar', (_, v) => [null, v + 1]))
+    .concat({
+      process: {
+        foo: (_, v) => [null, v * 2],
+        bar: (_, v) => [null, v + 1]
+      }
+    })
     .concat(capture(res));
 
   create(graph)
@@ -95,6 +120,29 @@ test('message types', t => {
     .dispatch(src, message('bar', 23));
 
   t.deepEqual(res, [42, 24]);
+});
+
+
+test('fallback processor handler', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat({
+      process: {
+        foo: (_, v) => [null, v * 2],
+        bar: (_, v) => [null, v * 3],
+        '*': (_, v) => [null, v + 1]
+      }
+    })
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, message('foo', 21))
+    .dispatch(src, message('bar', 22))
+    .dispatch(src, message('baz', 23));
+
+  t.deepEqual(res, [42, 66, 24]);
 });
 
 
@@ -386,19 +434,19 @@ test('invalid processors', t => {
 
   t.throws(
     () => create([src, 23]),
-    "Expected function or object with 'process' function property but got number");
+    "Expected function or object matching processor shape but got number");
 
   t.throws(
     () => create([src, {}]),
-    "Expected function or object with 'process' function property but got object");
+    "Expected function or object matching processor shape but got object");
 
   t.throws(
     () => create([src, null]),
-    "Expected function or object with 'process' function property but got null");
+    "Expected function or object matching processor shape but got null");
 
   t.throws(
     () => create([src, input()]),
-    "Expected function or object with 'process' function property but got object");
+    "Expected function or object matching processor shape but got object");
 });
 
 
