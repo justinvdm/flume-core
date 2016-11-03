@@ -20,8 +20,8 @@
 
     return self;
 
-    function dispatch(def, msgs, done) {
-      var nodes = inputsOf(self.inputs, def);
+    function dispatch(src, msgs, done) {
+      var nodes = inputsOf(self.inputs, src);
       var n = nodes.length;
       var i = -1;
 
@@ -194,8 +194,9 @@
     }
 
     function process() {
+      var parent = task.parent;
       return node.def.type === task.msg.type
-        ? node.def.process(state, task.msg.value, task.parent.index, node.graph)
+        ? node.def.process(state, task.msg.value, parent.def, node.graph)
         : [state, task.msg];
     }
 

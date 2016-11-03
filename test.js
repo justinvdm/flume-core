@@ -142,7 +142,7 @@ test('multiple inputs of same type', t => {
 });
 
 
-test('parent indices', t => {
+test('process using parent defs', t => {
   const src1 = input();
   const src2 = input();
   const res = [];
@@ -150,18 +150,23 @@ test('parent indices', t => {
   const graph = [[src1, src2]]
     .concat({
       init: () => 2,
-      process: (state, v, i) => [state + v, state + v + i]
+      process: (state, v, src) => {
+        switch (src) {
+          case src1: return [state, v * 2];
+          case src2: return [state, v * 3];
+          default: return [state, v];
+        }
+      }
     })
-    .concat((_, v) => [null, v * 2])
     .concat(capture(res));
 
   create(graph)
     .dispatch(src1, 2)
     .dispatch(src2, 3)
-    .dispatch(src2, 21)
-    .dispatch(src1, 23);
+    .dispatch(src2, 4)
+    .dispatch(src1, 5);
 
-  t.deepEqual(res, [8, 16, 58, 102]);
+  t.deepEqual(res, [4, 9, 12, 10]);
 });
 
 
@@ -402,7 +407,7 @@ test('dispatch access for processors', t => {
   const res = [];
 
   const graph = [src]
-    .concat((state, v, i, {dispatch}) => {
+    .concat((state, v, src, {dispatch}) => {
       if (v > 0) dispatch(src, v - 1);
       return [state, v + 1];
     })
