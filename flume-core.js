@@ -213,13 +213,19 @@
     }
 
     function success(res) {
+      var msg;
+
       if (Array.isArray(res)) {
         state = res[0];
-        return res[1];
+        msg = res.length > 1
+          ? res[1]
+          : state;
       }
       else {
-        return nil;
+        msg = nil;
       }
+
+      return msg;
     }
 
     function failure(e) {

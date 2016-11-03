@@ -419,3 +419,22 @@ test('dispatch access for processors', t => {
 
   t.deepEqual(res, [3, 2, 1, 4, 3, 2, 1]);
 });
+
+
+test('state and value change shorthand', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat({
+      init: () => 1,
+      process: (state, v) => [state + v]
+    })
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, 21)
+    .dispatch(src, 23);
+
+  t.deepEqual(res, [22, 45]);
+});
