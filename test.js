@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { input, message, except, batch, create } from '.';
+import { input, message, trap, except, batch, create } from '.';
 
 
 function defer() {
@@ -120,6 +120,41 @@ test('message types', t => {
     .dispatch(src, message('bar', 23));
 
   t.deepEqual(res, [42, 24]);
+});
+
+
+test('trap', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat(trap({
+      foo: (_, v) => [null, v * 2],
+      bar: (_, v) => [null, v + 1]
+    }))
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, message('foo', 21))
+    .dispatch(src, message('bar', 23));
+
+  t.deepEqual(res, [42, 24]);
+});
+
+
+test('trap fallback handler', t => {
+  const src = input();
+  const res = [];
+
+  const graph = [src]
+    .concat(trap({foo: (state, v) => [state + v]}))
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src, message('bar', 3))
+    .dispatch(src, message('foo', 2));
+
+  t.deepEqual(res, [3, 5]);
 });
 
 

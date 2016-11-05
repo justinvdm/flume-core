@@ -44,11 +44,13 @@
 
 
   function except(fn) {
+    return trap({'flume:error': fn});
+  }
+
+
+  function trap(process) {
     return {
-      process: {
-        'flume:error': fn,
-        '*': exceptFallbackMsgHandler
-      }
+      process: conj({'*': trapFallbackMsgHandler}, process)
     };
   }
 
@@ -148,7 +150,7 @@
 
   // message processing
 
-  function exceptFallbackMsgHandler(state, v) {
+  function trapFallbackMsgHandler(state, v) {
     return [v];
   }
 
@@ -445,6 +447,7 @@
       input: input,
       message: message,
       batch: batch,
+      trap: trap,
       except: except,
       nil: nil,
       conj: conj,
@@ -457,6 +460,7 @@
       input: input,
       message: message,
       batch: batch,
+      trap: trap,
       except: except,
       nil: nil,
       conj: conj,
