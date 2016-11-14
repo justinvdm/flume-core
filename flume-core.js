@@ -211,9 +211,7 @@
 
       return processAsync()
         .then(resolveSeq)
-        .then(success, failure)
-        .then(done)
-        .then(null, throwUnhandled);
+        .then(success, failure);
     }
 
     function process() {
@@ -249,12 +247,12 @@
         msg = nil;
       }
 
-      return msg;
+      done(msg);
     }
 
     function failure(e) {
-      if (!node.child) throw e;
-      return message('flume:error', e);
+      if (!node.child) throw new UnhandledError(e);
+      done(message('flume:error', e));
     }
   }
 
@@ -415,12 +413,6 @@
 
   function isThenable(v) {
     return !!(v || 0).then;
-  }
-
-
-  function throwUnhandled(e) {
-    if (this instanceof Thenable) throw new UnhandledError(e);
-    else throw e;
   }
 
 
