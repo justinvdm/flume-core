@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { input, message, trap, except, batch, create } from '.';
+import { input, message, trap, except, create } from '.';
 
 
 function defer() {
@@ -432,8 +432,8 @@ test('batching', t => {
   const res = [];
 
   const graph = [src]
-    .concat((_, v) => [null, batch([v, v * 2])])
-    .concat((_, v) => [null, batch([v * 3, v * 4])])
+    .concat((_, v) => [null, [v, v * 2]])
+    .concat((_, v) => [null, [v * 3, v * 4]])
     .concat(capture(res));
 
   create(graph)

@@ -38,11 +38,6 @@
   }
 
 
-  function batch(values) {
-    return new Batch(values.map(castMessage));
-  }
-
-
   function except(fn) {
     return trap({'flume:error': fn});
   }
@@ -60,11 +55,6 @@
   function Msg(type, value) {
     this.type = type;
     this.value = value;
-  }
-
-
-  function Batch(messages) {
-    this.messages = messages;
   }
 
 
@@ -178,7 +168,7 @@
     var processAsync = maybeAsync(process);
 
     return function handle(msgs, parent, end) {
-      msgs = castBatch(msgs).messages;
+      msgs = castArray(msgs).map(castMessage);
 
       var i = -1;
       var n = msgs.length - 1;
@@ -313,13 +303,6 @@
   }
 
 
-  function castBatch(v) {
-    return !(v instanceof Batch)
-      ? batch([v])
-      : v;
-  }
-
-
   function castMessage(v) {
     return !(v instanceof Msg)
       ? message('flume:value', v)
@@ -438,7 +421,6 @@
       create: create,
       input: input,
       message: message,
-      batch: batch,
       trap: trap,
       except: except,
       nil: nil,
@@ -451,7 +433,6 @@
       create: create,
       input: input,
       message: message,
-      batch: batch,
       trap: trap,
       except: except,
       nil: nil,
