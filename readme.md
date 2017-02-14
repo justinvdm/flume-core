@@ -7,3 +7,9 @@
 ```
 Sorry about the lack of documentation, I know its really not great. Will add this as soon as I can.
 ```
+
+## install
+
+```
+$ npm i -S flume-core
+```
