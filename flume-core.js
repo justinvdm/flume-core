@@ -155,7 +155,7 @@
 
   function createInputHandler(node) {
     return function handle(msgs, end) {
-      node.child.handle(msgs, node, end);
+      node.child.handle(msgs, node, node, end);
     };
   }
 
@@ -167,23 +167,26 @@
     var state = node.def.init();
     var processAsync = maybeAsync(process);
 
-    return function handle(msgs, parent, end) {
+    return function handle(msgs, parent, source, end) {
       msgs = castArray(msgs).map(castMessage);
 
       var i = -1;
       var n = msgs.length - 1;
 
-      while (++i < n) schedule({
-        msg: msgs[i],
+      var taskDefaults = {
+        source: source,
         parent: parent,
-        end: noop
-      });
+      };
 
-      if (n > -1) schedule({
+      while (++i < n) schedule(conj(taskDefaults, {
+        msg: msgs[i],
+        end: noop
+      }));
+
+      if (n > -1) schedule(conj(taskDefaults, {
         msg: msgs[n],
-        parent: parent,
         end: end
-      });
+      }));
     };
 
     function schedule(task) {
@@ -207,19 +210,22 @@
     function process() {
       var fns = node.def.process;
       var fn = fns[task.msg.type] || fns['*'];
-      return fn
-        ? fn(state, task.msg.value, task.parent.def, node.graph)
-        : [state, task.msg];
+      return !fn
+        ? [state, task.msg]
+        : fn(state, task.msg.value, {
+          source: task.source.def,
+          parent: task.parent.def,
+          dispatch: node.graph.dispatch
+        });
     }
 
     function done(msgs) {
-      var end = task.end;
-
+      var currTask = task;
       isBusy = false;
       task = null;
 
-      if (node.child) node.child.handle(msgs, node, end);
-      else end();
+      if (node.child) node.child.handle(msgs, node, currTask.source, currTask.end);
+      else currTask.end();
 
       next();
     }

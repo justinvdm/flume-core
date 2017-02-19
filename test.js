@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import { input, message, trap, except, create } from '.';
+import {input, message, trap, except, create} from '.';
 
 
 function defer() {
@@ -233,8 +233,37 @@ test('process using parent defs', t => {
   const graph = [[src1, src2]]
     .concat({
       init: () => 2,
-      process: (state, v, src) => {
-        switch (src) {
+      process: (state, v, {parent}) => {
+        switch (parent) {
+          case src1: return [state, v * 2];
+          case src2: return [state, v * 3];
+          default: return [state, v];
+        }
+      }
+    })
+    .concat(capture(res));
+
+  create(graph)
+    .dispatch(src1, 2)
+    .dispatch(src2, 3)
+    .dispatch(src2, 4)
+    .dispatch(src1, 5);
+
+  t.deepEqual(res, [4, 9, 12, 10]);
+});
+
+
+test('process using source defs', t => {
+  const src1 = input();
+  const src2 = input();
+  const res = [];
+
+  const graph = [[src1, src2]]
+    .concat((_, v) => [v, v])
+    .concat({
+      init: () => 2,
+      process: (state, v, {source}) => {
+        switch (source) {
           case src1: return [state, v * 2];
           case src2: return [state, v * 3];
           default: return [state, v];
@@ -490,8 +519,8 @@ test('dispatch access for processors', t => {
   const res = [];
 
   const graph = [src]
-    .concat((state, v, src, {dispatch}) => {
-      if (v > 0) dispatch(src, v - 1);
+    .concat((state, v, {parent, dispatch}) => {
+      if (v > 0) dispatch(parent, v - 1);
       return [state, v + 1];
     })
     .concat(capture(res));
