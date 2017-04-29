@@ -43,9 +43,9 @@
   }
 
 
-  function trap(process) {
+  function trap(transform) {
     return {
-      process: conj({'*': trapFallbackMsgHandler}, process)
+      transform: conj({'*': trapFallbackMsgHandler}, transform)
     };
   }
 
@@ -63,10 +63,10 @@
   }
 
 
-  function ProcessorDef(opts) {
-    this.defType = 'processor';
+  function TransformDef(opts) {
+    this.defType = 'transform';
     this.init = ensure(opts.init, noop);
-    this.process = opts.process;
+    this.transform = opts.transform;
   }
 
 
@@ -86,8 +86,8 @@
     if (i < 0) return [];
 
     // tail
-    if (i) child = new Node(graph, createProcessorDef(defs[i]), child, index);
-    while (--i > 0) child = new Node(graph, createProcessorDef(defs[i]), child, 0);
+    if (i) child = new Node(graph, createTransformDef(defs[i]), child, index);
+    while (--i > 0) child = new Node(graph, createTransformDef(defs[i]), child, 0);
 
     return buildGraphHead(graph, defs[0], child);
   }
@@ -117,28 +117,28 @@
   }
 
 
-  function createProcessorDef(obj) {
+  function createTransformDef(obj) {
     if (typeof obj === 'function') {
       obj = {
-        process: {'flume:value': obj}
+        transform: {'flume:value': obj}
       };
     }
-    else if (typeof (obj || 0).process === 'function') {
+    else if (typeof (obj || 0).transform === 'function') {
       obj = conj(obj, {
-        process: {'flume:value': obj.process}
+        transform: {'flume:value': obj.transform}
       });
     }
-    else if (typeOf((obj || 0).process) !== 'object') {
+    else if (typeOf((obj || 0).transform) !== 'object') {
       throw new Error(
-        "Expected function or object matching processor shape but got " +
+        "Expected function or object matching transform shape but got " +
         typeOf(obj));
     }
 
-    return new ProcessorDef(obj);
+    return new TransformDef(obj);
   }
 
 
-  // message processing
+  // message transforming
 
   function trapFallbackMsgHandler(state, v) {
     return [v];
@@ -148,7 +148,7 @@
   function createHandler(node) {
     return {
       input: createInputHandler,
-      processor: createProcessorHandler
+      transform: createTransformHandler
     }[node.def.defType](node);
   }
 
@@ -160,12 +160,12 @@
   }
 
 
-  function createProcessorHandler(node) {
+  function createTransformHandler(node) {
     var queue = [];
     var isBusy = false;
     var task = null;
     var state = node.def.init();
-    var processAsync = maybeAsync(process);
+    var transformAsync = maybeAsync(transform);
 
     return function handle(msgs, parent, source, end) {
       msgs = castArray(msgs).map(castMessage);
@@ -202,13 +202,13 @@
     function run() {
       isBusy = true;
 
-      return processAsync()
+      return transformAsync()
         .then(resolveSeq)
         .then(success, failure);
     }
 
-    function process() {
-      var fns = node.def.process;
+    function transform() {
+      var fns = node.def.transform;
       var fn = fns[task.msg.type] || fns['*'];
       return !fn
         ? [state, task.msg]

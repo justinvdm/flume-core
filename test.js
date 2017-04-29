@@ -32,7 +32,7 @@ test('value propagation', t => {
   const graph = [src]
     .concat({
       init: () => 2,
-      process: (state, v) => [state + v, state + (v * 2)]
+      transform: (state, v) => [state + v, state + (v * 2)]
     })
     .concat((_, v) => [null, v + 1])
     .concat(capture(res));
@@ -54,7 +54,7 @@ test('error propagation', t => {
       throw new Error(v);
     })
     .concat(() => {
-      t.fail('this node should not process anything');
+      t.fail('this node should not transform anything');
     })
     .concat(except((_, e) => [null, e.message]))
     .concat(capture(res));
@@ -108,7 +108,7 @@ test('message types', t => {
 
   const graph = [src]
     .concat({
-      process: {
+      transform: {
         foo: (_, v) => [null, v * 2],
         bar: (_, v) => [null, v + 1]
       }
@@ -158,13 +158,13 @@ test('trap fallback handler', t => {
 });
 
 
-test('fallback processor handler', t => {
+test('fallback transform handler', t => {
   const src = input();
   const res = [];
 
   const graph = [src]
     .concat({
-      process: {
+      transform: {
         foo: (_, v) => [null, v * 2],
         bar: (_, v) => [null, v * 3],
         '*': (_, v) => [null, v + 1]
@@ -225,7 +225,7 @@ test('multiple inputs of same type', t => {
 });
 
 
-test('process using parent defs', t => {
+test('transform using parent defs', t => {
   const src1 = input();
   const src2 = input();
   const res = [];
@@ -233,7 +233,7 @@ test('process using parent defs', t => {
   const graph = [[src1, src2]]
     .concat({
       init: () => 2,
-      process: (state, v, {parent}) => {
+      transform: (state, v, {parent}) => {
         switch (parent) {
           case src1: return [state, v * 2];
           case src2: return [state, v * 3];
@@ -253,7 +253,7 @@ test('process using parent defs', t => {
 });
 
 
-test('process using source defs', t => {
+test('transform using source defs', t => {
   const src1 = input();
   const src2 = input();
   const res = [];
@@ -262,7 +262,7 @@ test('process using source defs', t => {
     .concat((_, v) => [v, v])
     .concat({
       init: () => 2,
-      process: (state, v, {source}) => {
+      transform: (state, v, {source}) => {
         switch (source) {
           case src1: return [state, v * 2];
           case src2: return [state, v * 3];
@@ -282,7 +282,7 @@ test('process using source defs', t => {
 });
 
 
-test('promise-based process results', async t => {
+test('promise-based transform results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
@@ -291,7 +291,7 @@ test('promise-based process results', async t => {
   const graph = [src]
     .concat({
       init: () => 2,
-      process: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
+      transform: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
     })
     .concat((_, v) => [null, v + 1])
     .concat(capture(res));
@@ -312,7 +312,7 @@ test('promise-based process results', async t => {
 });
 
 
-test('promise-based process state results', async t => {
+test('promise-based transform state results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
@@ -321,7 +321,7 @@ test('promise-based process state results', async t => {
   const graph = [src]
     .concat({
       init: () => 2,
-      process: (state, d) => [d.promise, state]
+      transform: (state, d) => [d.promise, state]
     })
     .concat((_, v) => [null, v + 1])
     .concat(capture(res));
@@ -342,7 +342,7 @@ test('promise-based process state results', async t => {
 });
 
 
-test('promise-based process msg results', async t => {
+test('promise-based transform msg results', async t => {
   const src = input();
   const res = [];
   const d1 = defer();
@@ -378,7 +378,7 @@ test('promise rejection', async t => {
   const graph = [src]
     .concat((_, d) => d.promise.then(v => Promise.reject(new Error(v))))
     .concat(() => {
-      t.fail('this node should not process anything');
+      t.fail('this node should not transform anything');
     })
     .concat(except((_, e) => [null, e.message]))
     .concat(capture(res));
@@ -493,28 +493,28 @@ test('invalid inputs', t => {
 });
 
 
-test('invalid processors', t => {
+test('invalid transforms', t => {
   const src = input();
 
   t.throws(
     () => create([src, 23]),
-    "Expected function or object matching processor shape but got number");
+    "Expected function or object matching transform shape but got number");
 
   t.throws(
     () => create([src, {}]),
-    "Expected function or object matching processor shape but got object");
+    "Expected function or object matching transform shape but got object");
 
   t.throws(
     () => create([src, null]),
-    "Expected function or object matching processor shape but got null");
+    "Expected function or object matching transform shape but got null");
 
   t.throws(
     () => create([src, input()]),
-    "Expected function or object matching processor shape but got object");
+    "Expected function or object matching transform shape but got object");
 });
 
 
-test('dispatch access for processors', t => {
+test('dispatch access for transforms', t => {
   const src = input();
   const res = [];
 
@@ -540,7 +540,7 @@ test('state and value change shorthand', t => {
   const graph = [src]
     .concat({
       init: () => 1,
-      process: (state, v) => [state + v]
+      transform: (state, v) => [state + v]
     })
     .concat(capture(res));
 
