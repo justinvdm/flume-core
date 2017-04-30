@@ -21,7 +21,10 @@ function defer() {
 
 
 function capture(arr) {
-  return (_, v) => arr.push(v);
+  return (_, v) => {
+    arr.push(v);
+    return {value: null};
+  }
 }
 
 
@@ -32,9 +35,12 @@ test('value propagation', t => {
   const graph = [src]
     .concat({
       init: () => 2,
-      transform: (state, v) => [state + v, state + (v * 2)]
+      transform: (state, v) => ({
+        state: state + v,
+        value: state + (v * 2)
+      }),
     })
-    .concat((_, v) => [null, v + 1])
+    .concat((_, v) => ({value: v + 1 }))
     .concat(capture(res));
 
   create(graph)
@@ -56,7 +62,7 @@ test('error propagation', t => {
     .concat(() => {
       t.fail('this node should not transform anything');
     })
-    .concat(except((_, e) => [null, e.message]))
+    .concat(except((_, e) => ({value: e.message})))
     .concat(capture(res));
 
   create(graph)
@@ -72,11 +78,11 @@ test('except fallback handler', t => {
   const res = [];
 
   const graph = [src]
-    .concat((_, v) => {
-      if (v % 2) throw new Error(v);
-      return [null, v];
+    .concat((_, value) => {
+      if (value % 2) throw new Error(value);
+      return {value};
     })
-    .concat(except((state, e) => [state + +e.message]))
+    .concat(except((state, e) => ({state: state + +e.message})))
     .concat(capture(res));
 
   create(graph)
@@ -109,8 +115,8 @@ test('message types', t => {
   const graph = [src]
     .concat({
       transform: {
-        foo: (_, v) => [null, v * 2],
-        bar: (_, v) => [null, v + 1]
+        foo: (_, v) => ({value: v * 2}),
+        bar: (_, v) => ({value: v + 1})
       }
     })
     .concat(capture(res));
@@ -129,8 +135,8 @@ test('trap', t => {
 
   const graph = [src]
     .concat(trap({
-      foo: (_, v) => [null, v * 2],
-      bar: (_, v) => [null, v + 1]
+      foo: (_, v) => ({value: v * 2}),
+      bar: (_, v) => ({value: v + 1})
     }))
     .concat(capture(res));
 
@@ -147,7 +153,7 @@ test('trap fallback handler', t => {
   const res = [];
 
   const graph = [src]
-    .concat(trap({foo: (state, v) => [state + v]}))
+    .concat(trap({foo: (state, v) => ({state: state + v})}))
     .concat(capture(res));
 
   create(graph)
@@ -165,9 +171,9 @@ test('fallback transform handler', t => {
   const graph = [src]
     .concat({
       transform: {
-        foo: (_, v) => [null, v * 2],
-        bar: (_, v) => [null, v * 3],
-        '*': (_, v) => [null, v + 1]
+        foo: (_, v) => ({value: v * 2}),
+        bar: (_, v) => ({value: v * 3}),
+        '*': (_, v) => ({value: v + 1})
       }
     })
     .concat(capture(res));
@@ -186,11 +192,11 @@ test('multiple inputs', t => {
   const src2 = input();
   const res = [];
 
-  const a = [src1, (_, v) => [null, v + 1]];
-  const b = [src2, (_, v) => [null, v * 2]];
+  const a = [src1, (_, v) => ({value: v + 1})];
+  const b = [src2, (_, v) => ({value: v * 2})];
 
   const graph = [[a, b]]
-    .concat((_, v) => [null, v])
+    .concat((_, value) => ({value}))
     .concat(capture(res));
 
   create(graph)
@@ -208,13 +214,13 @@ test('multiple inputs of same type', t => {
   const res = [];
 
   const a = [src]
-    .concat((_, v) => [null, v + 1]);
+    .concat((_, v) => ({value: v + 1}));
 
   const b = [src]
-    .concat((_, v) => [null, v * 2]);
+    .concat((_, v) => ({value: v * 2}));
 
   const graph = [[a, b]]
-    .concat((_, v) => [null, v])
+    .concat((_, v) => ({value: v}))
     .concat(capture(res));
 
   create(graph)
@@ -233,11 +239,22 @@ test('transform using parent defs', t => {
   const graph = [[src1, src2]]
     .concat({
       init: () => 2,
-      transform: (state, v, {parent}) => {
+      transform: (state, value, {parent}) => {
         switch (parent) {
-          case src1: return [state, v * 2];
-          case src2: return [state, v * 3];
-          default: return [state, v];
+          case src1: return {
+            state,
+            value: value * 2
+          };
+
+          case src2: return {
+            state,
+            value: value * 3
+          };
+
+          default: return {
+            state,
+            value
+          };
         }
       }
     })
@@ -259,14 +276,25 @@ test('transform using source defs', t => {
   const res = [];
 
   const graph = [[src1, src2]]
-    .concat((_, v) => [v, v])
+    .concat((_, v) => ({state: v}))
     .concat({
       init: () => 2,
-      transform: (state, v, {source}) => {
+      transform: (state, value, {source}) => {
         switch (source) {
-          case src1: return [state, v * 2];
-          case src2: return [state, v * 3];
-          default: return [state, v];
+          case src1: return {
+            state,
+            value: value * 2
+          };
+
+          case src2: return {
+            state,
+            value: value * 3
+          };
+
+          default: return {
+            state,
+            value
+          };
         }
       }
     })
@@ -291,9 +319,12 @@ test('promise-based transform results', async t => {
   const graph = [src]
     .concat({
       init: () => 2,
-      transform: (state, d) => d.promise.then(v => [state + v, state + (v * 2)])
+      transform: (state, d) => d.promise.then(v => ({
+        state: state + v,
+        value: state + (v * 2)
+      }))
     })
-    .concat((_, v) => [null, v + 1])
+    .concat((_, v) => ({value: v + 1}))
     .concat(capture(res));
 
   create(graph)
@@ -312,63 +343,6 @@ test('promise-based transform results', async t => {
 });
 
 
-test('promise-based transform state results', async t => {
-  const src = input();
-  const res = [];
-  const d1 = defer();
-  const d2 = defer();
-
-  const graph = [src]
-    .concat({
-      init: () => 2,
-      transform: (state, d) => [d.promise, state]
-    })
-    .concat((_, v) => [null, v + 1])
-    .concat(capture(res));
-
-  create(graph)
-    .dispatch(src, d1)
-    .dispatch(src, d2);
-
-  t.deepEqual(res, []);
-
-  d2.resolve(23);
-  await immediate();
-  t.deepEqual(res, []);
-
-  d1.resolve(21);
-  await immediate();
-  t.deepEqual(res, [3, 22]);
-});
-
-
-test('promise-based transform msg results', async t => {
-  const src = input();
-  const res = [];
-  const d1 = defer();
-  const d2 = defer();
-
-  const graph = [src]
-    .concat((_, d) => [null, d.promise])
-    .concat((_, v) => [null, v + 1])
-    .concat(capture(res));
-
-  create(graph)
-    .dispatch(src, d1)
-    .dispatch(src, d2);
-
-  t.deepEqual(res, []);
-
-  d2.resolve(23);
-  await immediate();
-  t.deepEqual(res, []);
-
-  d1.resolve(21);
-  await immediate();
-  t.deepEqual(res, [22, 24]);
-});
-
-
 test('promise rejection', async t => {
   const src = input();
   const res = [];
@@ -380,7 +354,7 @@ test('promise rejection', async t => {
     .concat(() => {
       t.fail('this node should not transform anything');
     })
-    .concat(except((_, e) => [null, e.message]))
+    .concat(except((_, e) => ({value: e.message})))
     .concat(capture(res));
 
   create(graph)
@@ -407,7 +381,7 @@ test('dispatch callback', async t => {
   const d2 = defer();
 
   const graph = [[input(), src]]
-    .concat((_, d) => d.promise.then(() => [null, null]));
+    .concat((_, d) => d.promise.then(() => ({value: null})));
 
   create(graph)
     .dispatch(src, d1, () => resolved.push(d1))
@@ -432,13 +406,13 @@ test('dispatch callback for multiple inputs of same type', async t => {
   const d2 = defer();
 
   const a = [src]
-    .concat((_, d) => d.promise.then(() => [null, null]))
+    .concat((_, d) => d.promise.then(() => ({value: null})))
 
   const b = [src]
-    .concat(() => [null, null])
+    .concat(() => ({value: null}))
 
   const graph = [[a, b]]
-    .concat((_, v) => [null, v]);
+    .concat((_, value) => ({value}));
 
   create(graph)
     .dispatch(src, d1, () => resolved.push(d1))
@@ -461,8 +435,8 @@ test('batching', t => {
   const res = [];
 
   const graph = [src]
-    .concat((_, v) => [null, [v, v * 2]])
-    .concat((_, v) => [null, [v * 3, v * 4]])
+    .concat((_, v) => ({values: [v, v * 2]}))
+    .concat((_, v) => ({values: [v * 3, v * 4]}))
     .concat(capture(res));
 
   create(graph)
@@ -521,7 +495,10 @@ test('dispatch access for transforms', t => {
   const graph = [src]
     .concat((state, v, {parent, dispatch}) => {
       if (v > 0) dispatch(parent, v - 1);
-      return [state, v + 1];
+      return {
+        state,
+        value: v + 1
+      };
     })
     .concat(capture(res));
 
@@ -540,7 +517,7 @@ test('state and value change shorthand', t => {
   const graph = [src]
     .concat({
       init: () => 1,
-      transform: (state, v) => [state + v]
+      transform: (state, v) => ({state: state + v})
     })
     .concat(capture(res));
 

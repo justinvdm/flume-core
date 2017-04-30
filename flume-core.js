@@ -141,7 +141,7 @@
   // message transforming
 
   function trapFallbackMsgHandler(state, v) {
-    return [v];
+    return {state: v};
   }
 
 
@@ -154,8 +154,8 @@
 
 
   function createInputHandler(node) {
-    return function handle(msgs, end) {
-      node.child.handle(msgs, node, node, end);
+    return function handle(msg, end) {
+      node.child.handle([msg], node, node, end);
     };
   }
 
@@ -168,8 +168,7 @@
     var transformAsync = maybeAsync(transform);
 
     return function handle(msgs, parent, source, end) {
-      msgs = castArray(msgs).map(castMessage);
-
+      msgs = msgs.map(castMessage)
       var i = -1;
       var n = msgs.length - 1;
 
@@ -211,7 +210,7 @@
       var fns = node.def.transform;
       var fn = fns[task.msg.type] || fns['*'];
       return !fn
-        ? [state, task.msg]
+        ? {value: task.msg}
         : fn(state, task.msg.value, {
           source: task.source.def,
           parent: task.parent.def,
@@ -231,24 +230,14 @@
     }
 
     function success(res) {
-      var msg;
-
-      if (Array.isArray(res)) {
-        state = res[0];
-        msg = res.length > 1
-          ? res[1]
-          : state;
-      }
-      else {
-        msg = nil;
-      }
-
-      done(msg);
+      res = normalizeResult(state, res);
+      state = res.state;
+      done(res.values);
     }
 
     function failure(e) {
       if (!node.child) throw new UnhandledError(e);
-      done(message('flume:error', e));
+      done([message('flume:error', e)]);
     }
   }
 
@@ -313,6 +302,23 @@
     return !(v instanceof Msg)
       ? message('flume:value', v)
       : v;
+  }
+
+
+  function normalizeResult(state, raw) {
+    var hasState = raw.hasOwnProperty('state');
+    var values;
+
+    if (raw.hasOwnProperty('value')) values = [raw.value];
+    else if (raw.hasOwnProperty('values')) values = raw.values;
+    else if (hasState) values = [raw.state];
+
+    return {
+      values: values,
+      state: hasState
+        ? raw.state
+        : state
+    };
   }
 
 
