@@ -4,9 +4,7 @@
 
 > core library for [flume](https://github.com/justinvdm/flume)
 
-```
-Sorry about the lack of documentation, I know its really not great. Will add this as soon as I can.
-```
+See [flume](https://github.com/justinvdm/flume) for docs.
 
 ## install
 
