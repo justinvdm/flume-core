@@ -450,6 +450,7 @@
       nil: nil,
       conj: conj,
       maybeAsync: maybeAsync,
+      castThenable: castThenable,
       resolveSeq: resolveSeq
     };
 });
