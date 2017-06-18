@@ -1,5 +1,11 @@
-extends: eslint:recommended
+extends:
+  - eslint:recommended
+  - plugin:flowtype/recommended
+
 parser: babel-eslint
+
+plugins:
+  - flowtype
 
 globals:
   Promise: false

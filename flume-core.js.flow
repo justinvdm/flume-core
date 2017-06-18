@@ -1,0 +1,8 @@
+// @flow
+;(function(root, factory) {
+  if (typeof root.define === 'function' && root.define.amd) root.define(factory);
+  else if (typeof exports === 'object') factory(true);
+   // $FlowFixMe
+  else root.flume = factory();
+})(this, function(cjs) {
+});

@@ -14,8 +14,15 @@
   },
   "scripts": {
     "test": "ava",
-    "lint": "eslint index.js test.js",
-    "ci": "npm lint && npm test"
+    "lint": "eslint *.js",
+    "check": "npm run lint && npm test",
+    "ci": "npm run check",
+    "clean": "rm flume-core.js",
+    "transpile": "babel flume-core.js.flow > flume-core.js",
+    "build": "npm run clean && npm run transpile",
+    "preversion": "npm run check",
+    "version": "npm run build && git add -A flume-core.js",
+    "postversion": "git push && git push --tags"
   },
   "files": [
     "index.js"
@@ -29,8 +36,12 @@
   "dependencies": {},
   "devDependencies": {
     "ava": "^0.15.2",
+    "babel-cli": "^6.24.1",
     "babel-eslint": "^7.0.0",
+    "babel-preset-flow": "^6.23.0",
     "eslint": "^3.7.1",
+    "eslint-plugin-flowtype": "^2.34.0",
+    "flow-bin": "^0.48.0",
     "immediate-promise": "^1.1.0"
   }
 }
