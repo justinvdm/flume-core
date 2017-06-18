@@ -5,4 +5,60 @@
    // $FlowFixMe
   else root.flume = factory();
 })(this, function(cjs) {
+  type RawTransformDef =
+      TransformFn
+    | {
+      input?: TransformInitFn,
+      transform: TransformFn | {[string]: TransformFn}
+    }
+
+  type RawDef = RawTransformDef;
+
+  type TransformFn = (state: any, value: any, {
+    source: Def,
+    parent: Def,
+    dispatch: DispatchFn
+  }) => any;
+
+  type TransformInitFn = () => any;
+
+  type DispatchFn = (src: InputDef, value: any, done: () => any) => any;
+
+  type HandleFn = (
+    msg: Msg[],
+    parent: InputDef | null,
+    source?: InputDef,
+    end?: () => any,
+  ) => void;
+
+  type Msg = {
+    type: string,
+    value: any
+  };
+
+  type InputDef = {
+    defType: 'input'
+  };
+
+  type TransformDef = {
+    defType: 'transform',
+    init: function,
+    transform: function
+  };
+
+  type Def = InputDef | TransformDef;
+
+  type Graph = null;
+
+  type Node = {
+    graph: Graph,
+    def: Def,
+    child: Node | null,
+    index: number,
+    handler: HandleFn
+  };
+
+  function input() : InputDef {
+    return {defType: 'input'};
+  }
 });
