@@ -1,36 +1,43 @@
 {
   "name": "flume-core",
-  "version": "0.1.3",
+  "version": "0.0.0",
   "description": "core library for flume",
   "license": "MIT",
   "repository": "justinvdm/flume-core",
-  "main": "flume-core.js",
   "author": {
     "name": "justinvdm",
-    "url": "justinvdm.github.io"
+    "email": "justnvdm@gmail.com"
   },
   "engines": {
     "node": ">=4"
   },
   "scripts": {
-    "test": "ava",
-    "lint": "eslint index.js test.js",
-    "ci": "npm lint && npm test"
+    "test": "npm run lint && npm run typecheck && npm run unit",
+    "typecheck": "flow --color always",
+    "lint": "standard './**/*.js' './**/*.js.flow'",
+    "unit": "ava",
+    "release": "np"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "index.js.flow"
   ],
   "keywords": [
-    "dataflow",
-    "reactive",
-    "frp",
-    "flux"
+    ""
   ],
-  "dependencies": {},
   "devDependencies": {
-    "ava": "^0.15.2",
-    "babel-eslint": "^7.0.0",
-    "eslint": "^3.7.1",
-    "immediate-promise": "^1.1.0"
+    "ava": "latest",
+    "babel-eslint": "latest",
+    "flow-bin": "latest",
+    "prettier-standard": "latest",
+    "standard": "latest",
+    "np": "latest",
+    "eslint-plugin-flowtype": "latest"
+  },
+  "standard": {
+    "parser": "babel-eslint",
+    "plugins": [
+      "flowtype"
+    ]
   }
 }

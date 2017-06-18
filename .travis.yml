@@ -1,4 +1,14 @@
 language: node_js
+
 node_js:
-  - '7'
-  - '4'
+  - 'node'
+  - 8
+  - 6
+  - 4
+
+before_install:
+- '[[ $(node -v) =~ ^v9.*$ ]] || npm i -g npm@latest'
+- npm i -g greenkeeper-lockfile@1
+
+before_script: greenkeeper-lockfile-update
+after_script: greenkeeper-lockfile-upload
