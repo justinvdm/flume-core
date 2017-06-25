@@ -5,14 +5,20 @@
    // $FlowFixMe
   else root.flume = factory();
 })(this, function(cjs) {
-  type RawTransformDef =
-      TransformFn
-    | {
-      input?: TransformInitFn,
-      transform: TransformFn | {[string]: TransformFn}
-    }
+  type InputDef = {
+    defType: 'input'
+  };
 
-  type RawDef = RawTransformDef;
+  type TransformDef = {
+    parents: Defs,
+    defType: 'transform',
+    init: TransformInitFn,
+    transform: TransformFn
+  };
+
+  type Def = InputDef | TransformDef;
+
+  type Defs = Def | Def[];
 
   type TransformFn = (state: any, value: any, {
     source: Def,
@@ -36,18 +42,6 @@
     value: any
   };
 
-  type InputDef = {
-    defType: 'input'
-  };
-
-  type TransformDef = {
-    defType: 'transform',
-    init: function,
-    transform: function
-  };
-
-  type Def = InputDef | TransformDef;
-
   type Graph = null;
 
   type Node = {
@@ -58,7 +52,21 @@
     handler: HandleFn
   };
 
+  function noop() {
+  }
+
   function input() : InputDef {
     return {defType: 'input'};
+  }
+
+  function transform(transformFn: TransformFn, transformInitFn: ?TransformInitFn) : function {
+    return function transformFn(parents: Defs) : TransformDef {
+      return {
+        parents: parents,
+        defType: 'transform',
+        init: transformInitFn || noop,
+        transform: transformFn
+      };
+    };
   }
 });
