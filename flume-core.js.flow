@@ -5,68 +5,213 @@
    // $FlowFixMe
   else root.flume = factory();
 })(this, function(cjs) {
-  type InputDef = {
-    defType: 'input'
-  };
+  type InputDef = {|
+    type: 'input'
+  |};
 
-  type TransformDef = {
-    parents: Defs,
-    defType: 'transform',
+  type TransformDef = {|
+    parents: Def[],
+    type: 'transform',
     init: TransformInitFn,
     transform: TransformFn
-  };
+  |};
 
   type Def = InputDef | TransformDef;
 
   type Defs = Def | Def[];
 
-  type TransformFn = (state: any, value: any, {
-    source: Def,
-    parent: Def,
-    dispatch: DispatchFn
-  }) => any;
+  type TransformFn = (state: any, value: any) => any;
 
   type TransformInitFn = () => any;
 
-  type DispatchFn = (src: InputDef, value: any, done: () => any) => any;
-
-  type HandleFn = (
-    msg: Msg[],
-    parent: InputDef | null,
-    source?: InputDef,
-    end?: () => any,
-  ) => void;
-
-  type Msg = {
+  type Msg = {|
     type: string,
     value: any
-  };
+  |};
 
-  type Graph = null;
+  type Task = {|
+    msg: Msg,
+    source: InputDef,
+    parent: Def
+  |}
 
-  type Node = {
-    graph: Graph,
+  type Graph = {|
+    inputs: Node[]
+  |};
+
+  type Node = {|
     def: Def,
-    child: Node | null,
-    index: number,
-    handler: HandleFn
-  };
+    child: ?Node,
+    parentIndex: number,
+    state: ?NodeState
+  |};
 
-  function noop() {
+  type NodeState = {|
+    tasks: Task[],
+    status: 'idle' | 'busy',
+    data: any
+  |}
+
+  function input(): InputDef {
+    return {type: 'input'};
   }
 
-  function input() : InputDef {
-    return {defType: 'input'};
-  }
-
-  function transform(transformFn: TransformFn, transformInitFn: ?TransformInitFn) : function {
-    return function transformFn(parents: Defs) : TransformDef {
+  function transform(init: TransformInitFn, transform: TransformFn): () => any {
+    return function transformFn(parents: Defs): TransformDef {
       return {
-        parents: parents,
-        defType: 'transform',
-        init: transformInitFn || noop,
-        transform: transformFn
+        parents: castArray(parents),
+        type: 'transform',
+        init: init,
+        transform: transform
       };
+    };
+  }
+
+  function map(fn: () => any): () => any {
+    return transform(retNull, mapFn);
+
+    function mapFn(_, v) {
+      return [null, fn(v)];
+    }
+  }
+
+  function create(tailDef: Def): Graph {
+    var inputs = [];
+    var queue = [createNode(tailDef, null, 0)];
+    var i;
+    var n;
+    var node;
+
+    while (node = queue.shift()) {
+      if (node.def.type === 'input') {
+        inputs.push(node);
+      }
+      else {
+        i = -1;
+        n = node.def.parents.length;
+        while (++i < n) queue.push(createNode(node.def.parents[i], node, i));
+      }
+    }
+
+    return {inputs: inputs};
+  }
+
+  function dispatch(graph: Graph, source, value) {
+    var inputs = graph.inputs;
+    var n = inputs.length;
+    var i = -1;
+    var input;
+
+    while (++i < n) {
+      input = inputs[i];
+
+      if (input === source && input.child) {
+        processTask(input.child, createTask(source, input, value));
+      }
+    }
+  }
+
+  function createNode(def: Def, child: ?Node, parentIndex: number): Node {
+    return def.type === 'input'
+      ? createInputNode(def, child, parentIndex)
+      : createTransformNode(def, child, parentIndex)
+  }
+
+  function createInputNode(def: InputDef, child: ?Node, parentIndex: number): Node {
+    return {
+      def: def,
+      child: child,
+      parentIndex: parentIndex,
+      state: null
+    };
+  }
+
+  function createTransformNode(def: TransformDef, child: ?Node, parentIndex: number): Node {
+    return {
+      def: def,
+      child: child,
+      parentIndex: parentIndex,
+      state: {
+        tasks: [],
+        status: 'idle',
+        state: def.init()
+      }
+    };
+  }
+
+  function createValueMsg(value) {
+    return {
+      type: '__value',
+      value: value
+    };
+  }
+
+  function createTask(source, parent, value) {
+    return {
+      source: source,
+      parent: parent,
+      msg: createValueMsg(value)
+    };
+  }
+
+  function castArray(v) {
+    return !Array.isArray(v)
+      ? [v]
+      : v;
+  }
+
+  function retNull() {
+    return null;
+  }
+
+  function processTask(node: TransformNode, task: Task) {
+    if (node.status === 'idle') runTask(node, task);
+    else node.tasks.push(task);
+  }
+
+  function runNextTask(node) {
+    var task = node.tasks.shift();
+    if (task) runTask(node, task);
+  }
+
+  function runTask(node: TransformNode, task: Task) {
+    node.state.status = 'busy';
+    node.state.state = node.def.transform(node.state, task.msg.value);
+    node.state.status = 'idle';
+    runNextTask();
+  }
+
+  function pipe(values: any[]) {
+    var v = values[0];
+    var i = 0;
+    var n = values.length - 1;
+    var fn;
+
+    while (++i < n) {
+      fn = values[i];
+      v = fn(v);
+    }
+
+    return v;
+  }
+
+  if (cjs) {
+    module.exports = {
+      input: input,
+      pipe: pipe,
+      create: create,
+      dispatch: dispatch,
+      transform: transform,
+      map: map
+    };
+  } else {
+    return {
+      input: input,
+      pipe: pipe,
+      create: create,
+      dispatch: dispatch,
+      transform: transform,
+      map: map
     };
   }
 });

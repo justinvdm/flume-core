@@ -1,6 +1,6 @@
 import test from 'ava';
 import immediate from 'immediate-promise';
-import {input, message, trap, except, create} from '.';
+import {pipe, create, input, transform} from '.';
 
 
 function defer() {
@@ -28,22 +28,15 @@ function capture(arr) {
 }
 
 
-test('value propagation', t => {
+test.only('value propagation', t => {
   const src = input();
   const res = [];
 
-  const graph = [src]
-    .concat({
-      init: () => 2,
-      transform: (state, v) => ({
-        state: state + v,
-        value: state + (v * 2)
-      }),
-    })
-    .concat((_, v) => ({value: v + 1 }))
-    .concat(capture(res));
-
-  create(graph)
+  create(pipe([
+      src,
+      transform(() => 2, (state, v) => [state + v, state + (v * 2)]),
+      map(v => v + 1)
+    ]))
     .dispatch(src, 21)
     .dispatch(src, 23);
 
