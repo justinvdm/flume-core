@@ -85,3 +85,32 @@ test.cb('async error propagation', t => {
     t.end();
   });
 });
+
+test('multiple inputs', t => {
+  const src1 = input();
+  const src2 = input();
+  const res = [];
+
+  const a = pipe(src1, map(v => v + 1));
+  const b = pipe(src2, map(v => v * 2));
+  const graph = create(pipe([a, b], capture(res)));
+
+  dispatch(graph, src1, 21);
+  dispatch(graph, src2, 23);
+
+  t.deepEqual(res, [22, 46]);
+});
+
+test('multiple inputs of same def', t => {
+  const src = input();
+  const res = [];
+
+  const a = pipe(src, map(v => v + 1));
+  const b = pipe(src, map(v => v * 2));
+  const graph = create(pipe([a, b], capture(res)));
+
+  dispatch(graph, src, 21);
+  dispatch(graph, src, 23);
+
+  t.deepEqual(res, [22, 42, 24, 46]);
+});
