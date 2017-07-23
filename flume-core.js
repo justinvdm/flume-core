@@ -323,7 +323,8 @@
     }
   }
 
-  function pipe(v/*:any*/, fns/*:Function[]*/)/*:any*/ {
+  function pipe(v/*:any*/, fns/*:Function | Function[]*/)/*:any*/ {
+    fns = castArray(fns);
     var i = -1;
     var n = fns.length;
 
