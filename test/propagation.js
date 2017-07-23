@@ -1,6 +1,6 @@
 // @flow
 import test from 'ava';
-import {pipe, create, input, map, transform, dispatch, except} from '..';
+import {pipe, create, input, map, transform, message, trap, dispatch, except} from '..';
 import {immediate, reject, callbacks, badCodePath} from './_utils';
 
 const capture = arr => map(v => arr.push(v));
@@ -38,6 +38,21 @@ test('error propagation', t => {
   dispatch(graph, src, 21)
   dispatch(graph, src, 23);
   t.deepEqual(res, [44, 48]);
+});
+
+test('arbitrary message propagation', t => {
+  const src = input();
+  const res = [];
+
+  const graph = create(pipe(src, [
+    trap('foo', map(v => v + 1)),
+    trap('bar', map(v => v * 2)),
+    capture(res)
+  ]));
+
+  dispatch(graph, src, message('foo', 21))
+  dispatch(graph, src, message('bar', 23));
+  t.deepEqual(res, [22, 46]);
 });
 
 test.cb('async value propagation', t => {

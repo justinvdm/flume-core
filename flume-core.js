@@ -228,18 +228,18 @@
     };
   }
 
-  function castMsg(type, obj/*:any*/)/*:Msg*/ {
+  function message(type/*:string*/, obj/*:any*/)/*:Msg*/ {
     return (obj || 0).__flumeType !== 'msg'
       ? createMsg(type, obj)
       : obj;
   }
 
   function castValueMsg(obj/*:any*/)/*:Msg*/ {
-    return castMsg('__value', obj);
+    return message('__value', obj);
   }
 
   function castErrorMsg(obj/*:any*/)/*:Msg*/ {
-    return castMsg('__error', obj);
+    return message('__error', obj);
   }
 
   function createTask(source/*:InputDef*/, parent/*:Def*/, msg/*:Msg*/, end/*:Function*/)/*:Task*/ {
@@ -438,6 +438,7 @@
     exports.trap = trap;
     exports.except = except;
     exports.seq = seq;
+    exports.message = message;
   } else {
     return {
       input: input,
@@ -448,7 +449,8 @@
       map: map,
       trap: trap,
       except: except,
-      sequence: seq
+      seq: seq,
+      message: message
     };
   }
 });
