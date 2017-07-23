@@ -60,7 +60,16 @@
     tasks: Task[],
     status: 'idle' | 'busy',
     data: any
-  }
+  };
+  
+  type RawSequenceStep = Function | [?Function, ?Function];
+
+  type RawSequence = RawSequenceStep[] | Function;
+
+  type SequenceStep = {
+    onSuccess: Function,
+    onFailure: Function
+  };
   */
 
   function input()/*:InputDef*/ {
@@ -266,6 +275,69 @@
     return res;
   }
 
+  function seq(sequence/*:RawSequence*/)/*:Function*/ {
+    var steps = []
+      .concat(sequence)
+      .concat([[null, throwError]])
+      .map(normalizeSequenceStep);
+
+    var n = steps.length;
+
+    return function sequenceFn(v/*:any*/) {
+      var i = -1;
+      var p = new Thenable(false, v);
+      var step;
+
+      while (++i < n) {
+        step = steps[i];
+        p = p.then(step.onSuccess, step.onFailure);
+      }
+    };
+  }
+
+  function normalizeSequenceStep(step/*:RawSequenceStep*/)/*:SequenceStep*/ {
+    var onSuccess;
+    var onFailure;
+
+    if (typeof step == 'function') onSuccess = step;
+    else {
+      onSuccess = step[0];
+      onFailure = step[1];
+    }
+
+    return {
+      onSuccess: onSuccess || identity,
+      onFailure: onFailure || throwError
+    };
+  }
+
+  function Thenable(isError/*:boolean*/, v/*:any*/) {
+    if ((v || 0).then) return v;
+    this.isError = isError;
+    this.v = v;
+  }
+
+  Thenable.prototype.then = function then(onSuccess/*:Function*/, onFailure/*:Function*/) {
+    var v = this.v;
+
+    try {
+      return new Thenable(false, this.isError
+        ? onFailure(v)
+        : onSuccess(v));
+    }
+    catch (e) {
+      return new Thenable(true, e);
+    }
+  };
+
+  function throwError(e) {
+    throw e;
+  }
+
+  function identity(v) {
+    return v;
+  }
+
   if (cjs) {
     exports.pipe = pipe;
     exports.input = input;
@@ -275,6 +347,7 @@
     exports.map = map;
     exports.trap = trap;
     exports.except = except;
+    exports.seq = seq;
   } else {
     return {
       input: input,
@@ -284,7 +357,8 @@
       transform: transform,
       map: map,
       trap: trap,
-      except: except
+      except: except,
+      sequence: seq
     };
   }
 });

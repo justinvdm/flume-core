@@ -1,6 +1,6 @@
 // @flow
 import test from 'ava';
-import {pipe, create, input, map, transform, dispatch, except} from './flume-core';
+import {pipe, create, input, map, transform, dispatch, except} from '..';
 
 const capture = arr => map(v => arr.push(v));
 

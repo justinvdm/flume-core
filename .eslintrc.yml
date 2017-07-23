@@ -17,3 +17,4 @@ rules:
   no-console: [2, allow: [warn, error]]
   no-extra-semi: 0
   no-cond-assign: 0
+  no-sparse-arrays: 0
