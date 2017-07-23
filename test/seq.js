@@ -2,7 +2,7 @@
 import test from 'ava';
 
 import {seq} from '..';
-import {immediate, reject} from './_utils';
+import {immediate, reject, badCodePath} from './_utils';
 
 test.cb('sync value propagation', t => {
   seq([
@@ -18,6 +18,7 @@ test.cb('sync value propagation', t => {
 test.cb('sync error propagation', t => {
   seq([
     v => { throw v; },
+    badCodePath(t),
     [, e => +e + 1],
     v => { throw v; },
     [, e => { throw e; }],
@@ -45,6 +46,7 @@ test.cb('async value propagation', t => {
 test.cb('async error propagation', t => {
   seq([
     reject,
+    badCodePath(t),
     [, e => +e + 1],
     immediate,
     reject,

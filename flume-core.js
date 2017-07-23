@@ -18,12 +18,10 @@
   type TransformDescription = {
     msgType: string,
     init: TransformInitFn,
-    transform: TransformFn
+    transform: RawSequence
   };
 
   type Def = InputDef | TransformDef;
-
-  type TransformFn = (state: any, value: any) => any;
 
   type TransformInitFn = () => any;
 
@@ -38,29 +36,35 @@
   type Task = {
     msg: Msg,
     source: InputDef,
-    parent: Def
+    parent: Def,
+    end: Function
   }
-
+;
   type Graph = {
-    inputs: Node[]
+    inputs: InputNode[]
   };
 
-  type NodeType<Def, Child, State> = {
+  type NodeType<Def, Child, State, Methods> = {
     def: Def,
     child: ?Child,
     state: State,
-    parentIndex: number
+    parentIndex: number,
+    methods: Methods
   };
 
-  type InputNode = NodeType<InputDef, TransformNode, null>;
-  type TransformNode = NodeType<TransformDef, TransformNode, TransformState>;
+  type InputNode = NodeType<InputDef, TransformNode, null, null>;
+  type TransformNode = NodeType<TransformDef, TransformNode, TransformState, Object>;
   type Node = InputNode | TransformNode;
 
   type TransformState = {
     tasks: Task[],
-    status: 'idle' | 'busy',
+    currentTask: ?Task,
     data: any
   };
+
+  type TransformResult = [any, any];
+
+  type TaskRunner = Task => void;
   
   type RawSequenceStep = Function | [?Function, ?Function];
 
@@ -72,6 +76,8 @@
   };
   */
 
+  var isArray = Array.isArray;
+
   function input()/*:InputDef*/ {
     return {
       type: 'input',
@@ -80,7 +86,7 @@
     };
   }
 
-  function transform(init/*:TransformInitFn*/, transform/*:TransformFn*/)/*:TransformDefFn*/ {
+  function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformDefFn*/ {
     return function transformFn(parents/*:**/)/*:**/ {
       return {
         parents: castArray(parents),
@@ -95,11 +101,19 @@
   }
 
   function map(fn/*:Function*/)/*:TransformDefFn*/ {
-    return transform(retNull, mapFn);
+    return transform(retNull, [
+      retValue,
+      seq(fn),
+      retStateless
+    ]);
+  }
 
-    function mapFn(_, v) {
-      return [null, fn(v)];
-    }
+  function retValue(_/*:**/, v/*:**/)/*:**/ {
+    return v;
+  }
+
+  function retStateless(v) {
+    return [null, v];
   }
 
   function trap(msgType/*:string*/, fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
@@ -144,21 +158,39 @@
     return {inputs: inputs};
   }
 
-  function dispatch(graph/*:Graph*/, source/*:InputDef*/, value/*:any*/)/*:Graph*/ {
+  function dispatch(graph/*:Graph*/, source/*:InputDef*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
+    var inputs = findInputs(graph, source);
+    var n = inputs.length;
+    var i = -1;
+    var task;
+    var input;
+
+    end = end
+      ? callOnNth(n, end)
+      : identity;
+
+    while (++i < n) {
+      input = inputs[i];
+      task = createTask(source, input.def, castValueMsg(value), end);
+      if (input.child) processTask(input.child, task);
+    }
+
+    return graph;
+  }
+
+  function findInputs(graph/*:Graph*/, def/*:InputDef*/)/*:InputNode[]*/ {
     var inputs = graph.inputs;
     var n = inputs.length;
     var i = -1;
     var input;
+    var targets = [];
 
     while (++i < n) {
       input = inputs[i];
-
-      if (input.def === source && input.child) {
-        processTask(input.child, createTask(source, input.def, castValueMsg(value)));
-      }
+      if (input.def === def && input.child) targets.push(input);
     }
 
-    return graph;
+    return targets;
   }
 
   function createInputNode(def/*:InputDef*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
@@ -166,21 +198,26 @@
       def: def,
       child: child,
       parentIndex: parentIndex,
+      methods: null,
       state: null
     };
   }
 
   function createTransformNode(def/*:TransformDef*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:TransformNode*/ {
-    return {
+    var node = {
       def: def,
       child: child,
       parentIndex: parentIndex,
+      methods: {},
       state: {
         tasks: [],
-        status: 'idle',
+        currentTask: null,
         data: def.description.init()
       }
     };
+
+    node.methods.run = createTaskRunner(node);
+    return node;
   }
 
   function createMsg(type/*:string*/, value/*:any*/) {
@@ -191,30 +228,31 @@
     };
   }
 
-  function createValueMsg(value/*:any*/)/*:Msg*/ {
-    return createMsg('__value', value);
-  }
-
-  function createErrorMsg(error/*:any*/)/*:Msg*/ {
-    return createMsg('__error', error);
-  }
-
-  function castValueMsg(obj/*any*/)/*:Msg*/ {
+  function castMsg(type, obj/*:any*/)/*:Msg*/ {
     return (obj || 0).__flumeType !== 'msg'
-      ? createValueMsg(obj)
+      ? createMsg(type, obj)
       : obj;
   }
 
-  function createTask(source/*:InputDef*/, parent/*:Def*/, msg/*:Msg*/) {
+  function castValueMsg(obj/*:any*/)/*:Msg*/ {
+    return castMsg('__value', obj);
+  }
+
+  function castErrorMsg(obj/*:any*/)/*:Msg*/ {
+    return castMsg('__error', obj);
+  }
+
+  function createTask(source/*:InputDef*/, parent/*:Def*/, msg/*:Msg*/, end/*:Function*/)/*:Task*/ {
     return {
       source: source,
       parent: parent,
-      msg: msg
+      msg: msg,
+      end: end
     };
   }
 
   function castArray(v/*:any*/)/*:any[]*/ {
-    return !Array.isArray(v)
+    return !isArray(v)
       ? [v]
       : v;
   }
@@ -225,8 +263,8 @@
 
   function processTask(node/*:TransformNode*/, task/*:Task*/) {
     var state = node.state;
-    if (state.status === 'idle') runTask(node, task);
-    else state.tasks.push(task);
+    if (state.currentTask) state.tasks.push(task);
+    else runTask(node, task);
   }
 
   function runNextTask(node/*:TransformNode*/) {
@@ -234,28 +272,55 @@
     if (task) runTask(node, task);
   }
 
-  function runTask(node/*:TransformNode*/, task/*:Task*/) {
+  function runTask(node, task) {
+    node.methods.run(task);
+  }
+
+  function createTaskRunner(node/*:TransformNode*/)/*:TaskRunner*/ {
     var state = node.state;
-    var description = node.def.description;
-    var msg = task.msg;
-    var res;
+    var def = node.def;
+    var description = def.description;
+    var msgType = description.msgType;
+    var transform = seq(description.transform);
 
-    if (msg.type === description.msgType) {
-      state.status = 'busy';
+    var run = seq([
+      begin,
+      [onSuccess, castErrorMsg],
+      end
+    ]);
 
-      try {
-        res = description.transform(state.data, task.msg.value);
-        state.data = res[0];
-        msg = castValueMsg(res[1]);
-      } catch(e) {
-        msg = createErrorMsg(e);
-      }
+    return function taskRunnerFn(task/*:Task*/) {
+      var msg = task.msg;
+      if (msg.type === msgType) run(task);
+      else next(task, msg);
+    };
 
-      state.status = 'idle';
+    function begin(task/*:Task*/) {
+      state.currentTask = task;
+      return transform(state.data, task.msg.value);
     }
 
-    if (node.child) processTask(node.child, createTask(task.source, node.def, msg));
-    runNextTask(node);
+    function end(msg/*:Msg*/) {
+      var task = state.currentTask;
+      state.currentTask = null;
+      if (task) next(task, msg);
+    }
+
+    function onSuccess(res/*:TransformResult*/) {
+      state.data = res[0];
+      return castValueMsg(res[1]);
+    }
+
+    function next(task/*:Task*/, msg/*:Msg*/) {
+      if (node.child) {
+        processTask(node.child, createTask(task.source, def, msg, task.end));
+      }
+      else {
+        task.end();
+      }
+
+      runNextTask(node);
+    }
   }
 
   function pipe(v/*:any*/, fns/*:Function[]*/)/*:any*/ {
@@ -283,19 +348,29 @@
 
     var n = steps.length;
 
-    return function sequenceFn(v/*:any*/) {
+    return function sequenceFn() {
       var i = -1;
-      var p = new Thenable(false, v);
+      var p = new Thenable(false, arguments);
       var step;
 
       while (++i < n) {
         step = steps[i];
         p = p.then(step.onSuccess, step.onFailure);
       }
+
+      return p;
     };
   }
 
-  function normalizeSequenceStep(step/*:RawSequenceStep*/)/*:SequenceStep*/ {
+  function spread(fn/*:Function*/)/*:Function*/ {
+    return function spreadFn(args/*:any[]*/) {
+      if (args.length === 1) return fn(args[0]);
+      if (args.length === 0) return fn();
+      return fn.apply(null, args);
+    }
+  }
+
+  function normalizeSequenceStep(step/*:RawSequenceStep*/, i/*:number*/)/*:SequenceStep*/ {
     var onSuccess;
     var onFailure;
 
@@ -305,9 +380,15 @@
       onFailure = step[1];
     }
 
+    onSuccess = onSuccess || identity;
+    onFailure = onFailure || throwError;
+
+    // first function should take in multiple args
+    if (i === 0) onSuccess = spread(onSuccess);
+
     return {
-      onSuccess: onSuccess || identity,
-      onFailure: onFailure || throwError
+      onSuccess: onSuccess,
+      onFailure: onFailure
     };
   }
 
@@ -323,12 +404,20 @@
     try {
       return new Thenable(false, this.isError
         ? onFailure(v)
-        : onSuccess(v));
+        : onSuccess(v))
     }
     catch (e) {
       return new Thenable(true, e);
     }
   };
+
+  function callOnNth(n/*:number*/, fn/*:Function*/)/*:Function*/ {
+    var i = 1;
+
+    return function callOnNthFn() {
+      if (++i > n) fn();
+    };
+  }
 
   function throwError(e) {
     throw e;
