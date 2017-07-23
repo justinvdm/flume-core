@@ -19,10 +19,10 @@ test.cb('sync error propagation', t => {
   seq([
     v => { throw v; },
     badCodePath(t),
-    [, e => +e + 1],
+    {failure: e => +e + 1},
     v => { throw v; },
-    [, e => { throw e; }],
-    [, e => e * 2],
+    {failure: e => { throw e; }},
+    {failure: e => e * 2},
     v => {
       t.is(v, 44);
       t.end();
@@ -47,13 +47,25 @@ test.cb('async error propagation', t => {
   seq([
     reject,
     badCodePath(t),
-    [, e => +e + 1],
+    {failure: e => +e + 1},
     immediate,
     reject,
-    [, reject],
-    [, e => e * 2],
+    {failure: reject},
+    {failure: e => e * 2},
     v => {
       t.is(v, 44);
+      t.end();
+    }
+  ])(21);
+});
+
+test.cb('nested sequences', t => {
+  seq([
+    v => v + 1,
+    [immediate, [v => v * 3, v => -v], reject],
+    [{failure: v => v * 2}],
+    v => {
+      t.is(v, -132);
       t.end();
     }
   ])(21);

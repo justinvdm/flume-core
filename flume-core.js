@@ -45,8 +45,8 @@
     source: InputDef,
     parent: Def,
     end: Function
-  }
-;
+  };
+
   type Graph = {
     inputs: InputNode[]
   };
@@ -72,18 +72,25 @@
   type TransformResult = [any, any];
 
   type TaskRunner = Task => void;
-  
-  type RawSequenceStep = Function | [?Function, ?Function];
 
-  type RawSequence = RawSequenceStep[] | Function;
+  type RawSequence = NestedRawSequence | NestedRawSequence[];
+
+  type NestedRawSequence =
+    | RawSequence
+    | SequenceStep;
+
+  type RawSequenceStep =
+    | Function
+    | {
+      success?: Function,
+      failure?: Function
+    };
 
   type SequenceStep = {
-    onSuccess: Function,
-    onFailure: Function
+    success: Function,
+    failure: Function
   };
   */
-
-  var isArray = Array.isArray;
 
   function input()/*:InputDef*/ {
     return {
@@ -110,7 +117,7 @@
   function map(fn/*:Function*/)/*:TransformDefFn*/ {
     return transform(retNull, [
       retValue,
-      seq(fn),
+      fn,
       retStateless
     ]);
   }
@@ -282,7 +289,7 @@
   }
 
   function castArray(v/*:any*/)/*:any[]*/ {
-    return !isArray(v)
+    return !Array.isArray(v)
       ? [v]
       : v;
   }
@@ -315,9 +322,14 @@
     var msgType = description.msgType;
     var transform = seq(description.transform);
 
+    var parse = {
+      success: success,
+      failure: errorMsg
+    };
+
     var run = seq([
       begin,
-      [onSuccess, errorMsg],
+      parse,
       end
     ]);
 
@@ -338,7 +350,7 @@
       if (task) next(task, res);
     }
 
-    function onSuccess(res/*:TransformResult*/) {
+    function success(res/*:TransformResult*/) {
       state.data = res[0];
       return res[1];
     }
@@ -373,10 +385,9 @@
     return res;
   }
 
-  function seq(sequence/*:RawSequence*/)/*:Function*/ {
-    var steps = []
-      .concat(sequence)
-      .concat([[null, throwError]])
+  function seq(sequence/*:NestedRawSequence*/)/*:Function*/ {
+    var steps = flattenDeep(castArray(sequence))
+      .concat({failure: throwError})
       .map(normalizeSequenceStep);
 
     var n = steps.length;
@@ -388,11 +399,26 @@
 
       while (++i < n) {
         step = steps[i];
-        p = p.then(step.onSuccess, step.onFailure);
+        p = p.then(step.success, step.failure);
       }
 
       return p;
     };
+  }
+
+  function flattenDeep(values) {
+    var res = [];
+    var i = -1;
+    var n = values.length;
+    var v;
+
+    while (++i < n) {
+      v = values[i];
+      if (Array.isArray(v)) append(res, flattenDeep(v));
+      else res.push(v);
+    }
+
+    return res;
   }
 
   function spread(fn/*:Function*/)/*:Function*/ {
@@ -404,24 +430,24 @@
   }
 
   function normalizeSequenceStep(step/*:RawSequenceStep*/, i/*:number*/)/*:SequenceStep*/ {
-    var onSuccess;
-    var onFailure;
+    var success;
+    var failure;
 
-    if (typeof step == 'function') onSuccess = step;
+    if (typeof step == 'function') success = step;
     else {
-      onSuccess = step[0];
-      onFailure = step[1];
+      success = step.success;
+      failure = step.failure;
     }
 
-    onSuccess = onSuccess || identity;
-    onFailure = onFailure || throwError;
+    success = success || identity;
+    failure = failure || throwError;
 
     // first function should take in multiple args
-    if (i === 0) onSuccess = spread(onSuccess);
+    if (i === 0) success = spread(success);
 
     return {
-      onSuccess: onSuccess,
-      onFailure: onFailure
+      success: success,
+      failure: failure
     };
   }
 
@@ -431,13 +457,13 @@
     this.v = v;
   }
 
-  Thenable.prototype.then = function then(onSuccess/*:Function*/, onFailure/*:Function*/) {
+  Thenable.prototype.then = function then(success/*:Function*/, failure/*:Function*/) {
     var v = this.v;
 
     try {
       return new Thenable(false, this.isError
-        ? onFailure(v)
-        : onSuccess(v))
+        ? failure(v)
+        : success(v))
     }
     catch (e) {
       return new Thenable(true, e);
@@ -452,7 +478,7 @@
     };
   }
 
-  function append(arr, values) {
+  function append(arr/*:any[]*/, values/*:any[]*/)/*:any[]*/ {
     var i = -1;
     var n = values.length;
     while (++i < n) arr.push(values[i]);
