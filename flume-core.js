@@ -1,10 +1,12 @@
 // @flow
 ;(function(root, factory) {
-  if (typeof root.define === 'function' && root.define.amd) root.define(factory);
-  else if (typeof exports === 'object') factory(true);
-   // $FlowFixMe
-  else root.flume = factory();
-})(this, function(cjs) {
+  if (typeof root.define === 'function' && root.define.amd)
+    root.define(function() { return factory({}) });
+  else if (typeof exports === 'object')
+    factory(exports);
+  else
+    (root/*:any*/).flume = factory({});
+})(this, function(exports) {
   /*::
   type DefType<Type, Parents, Description> = {
     type: Type,
@@ -464,32 +466,16 @@
   function identity(v) {
     return v;
   }
-
-  if (cjs) {
-    exports.pipe = pipe;
-    exports.input = input;
-    exports.create = create;
-    exports.dispatch = dispatch;
-    exports.transform = transform;
-    exports.map = map;
-    exports.trap = trap;
-    exports.except = except;
-    exports.seq = seq;
-    exports.msg = msg;
-    exports.list = list;
-  } else {
-    return {
-      input: input,
-      pipe: pipe,
-      create: create,
-      dispatch: dispatch,
-      transform: transform,
-      map: map,
-      trap: trap,
-      except: except,
-      seq: seq,
-      msg: msg,
-      list: list
-    };
-  }
+  
+  exports.input = input;
+  exports.pipe = pipe;
+  exports.create = create;
+  exports.dispatch = dispatch;
+  exports.transform = transform;
+  exports.map = map;
+  exports.trap = trap;
+  exports.except = except;
+  exports.seq = seq;
+  exports.msg = msg;
+  exports.list = list
 });
