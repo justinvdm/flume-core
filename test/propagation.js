@@ -1,6 +1,6 @@
 // @flow
 import test from 'ava';
-import {pipe, create, input, map, transform, message, trap, dispatch, except} from '..';
+import {pipe, create, input, map, transform, msg, list, trap, dispatch, except} from '..';
 import {immediate, reject, callbacks, badCodePath} from './_utils';
 
 const capture = arr => map(v => arr.push(v));
@@ -40,7 +40,7 @@ test('error propagation', t => {
   t.deepEqual(res, [44, 48]);
 });
 
-test('arbitrary message propagation', t => {
+test('arbitrary msg propagation', t => {
   const src = input();
   const res = [];
 
@@ -50,9 +50,24 @@ test('arbitrary message propagation', t => {
     capture(res)
   ]));
 
-  dispatch(graph, src, message('foo', 21))
-  dispatch(graph, src, message('bar', 23));
+  dispatch(graph, src, msg('foo', 21))
+  dispatch(graph, src, msg('bar', 23));
   t.deepEqual(res, [22, 46]);
+});
+
+test('batch propagation', t => {
+  const src = input();
+  const res = [];
+
+  const graph = create(pipe(src, [
+    map(v => list([v + 1, v * 2])),
+    capture(res)
+  ]));
+
+  dispatch(graph, src, 21);
+  dispatch(graph, src, 23);
+
+  t.deepEqual(res, [22, 42, 24, 46]);
 });
 
 test.cb('async value propagation', t => {

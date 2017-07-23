@@ -33,6 +33,11 @@
     value: any
   };
 
+  type List = {
+    __flumeType: 'list',
+    msgs: Msg[]
+  };
+
   type Task = {
     msg: Msg,
     source: InputDef,
@@ -162,7 +167,7 @@
     var inputs = findInputs(graph, source);
     var n = inputs.length;
     var i = -1;
-    var task;
+    var tasks;
     var input;
 
     end = end
@@ -171,8 +176,8 @@
 
     while (++i < n) {
       input = inputs[i];
-      task = createTask(source, input.def, castValueMsg(value), end);
-      if (input.child) processTask(input.child, task);
+      tasks = createTasks(source, input.def, value, end);
+      if (input.child) processTasks(input.child, tasks);
     }
 
     return graph;
@@ -220,26 +225,35 @@
     return node;
   }
 
-  function createMsg(type/*:string*/, value/*:any*/) {
+  function isOfType(type/*:string*/, obj/*:any*/) {
+    return obj && obj.__flumeType === type;
+  }
+
+  function msg(type/*:string*/, obj/*:any*/)/*Msg*/ {
+    if (isOfType('msg', obj)) return obj;
+
     return {
       __flumeType: 'msg',
       type: type,
-      value: value
+      value: obj
     };
   }
 
-  function message(type/*:string*/, obj/*:any*/)/*:Msg*/ {
-    return (obj || 0).__flumeType !== 'msg'
-      ? createMsg(type, obj)
-      : obj;
+  function list(obj/*:any*/)/*:List*/ {
+    if (isOfType('list', obj)) return obj;
+
+    return {
+      __flumeType: 'list',
+      msgs: castArray(obj).map(valueMsg)
+    };
   }
 
-  function castValueMsg(obj/*:any*/)/*:Msg*/ {
-    return message('__value', obj);
+  function valueMsg(obj/*:any*/)/*:Msg*/ {
+    return msg('__value', obj);
   }
 
-  function castErrorMsg(obj/*:any*/)/*:Msg*/ {
-    return message('__error', obj);
+  function errorMsg(e/*:any*/)/*:Msg*/ {
+    return msg('__error', e);
   }
 
   function createTask(source/*:InputDef*/, parent/*:Def*/, msg/*:Msg*/, end/*:Function*/)/*:Task*/ {
@@ -249,6 +263,20 @@
       msg: msg,
       end: end
     };
+  }
+
+  function createTasks(source/*:InputDef*/, parent/*:Def*/, value/*:any*/, end/*:Function*/)/*:Task[]*/ {
+    if (!isOfType('list', value)) return [
+      createTask(source, parent, valueMsg(value), end)
+    ];
+
+    var msgs = value.msgs;
+    var n = msgs.length;
+    var i = -1;
+    var tasks = [];
+    while (++i < n) tasks.push(createTask(source, parent, msgs[i], end));
+
+    return tasks;
   }
 
   function castArray(v/*:any*/)/*:any[]*/ {
@@ -261,14 +289,16 @@
     return null;
   }
 
-  function processTask(node/*:TransformNode*/, task/*:Task*/) {
+  function processTasks(node/*:TransformNode*/, tasks/*:Task[]*/) {
     var state = node.state;
-    if (state.currentTask) state.tasks.push(task);
-    else runTask(node, task);
+    append(state.tasks, tasks);
+    runNextTask(node);
   }
 
   function runNextTask(node/*:TransformNode*/) {
-    var task = node.state.tasks.shift();
+    var state = node.state;
+    if (state.currentTask) return;
+    var task = state.tasks.shift();
     if (task) runTask(node, task);
   }
 
@@ -285,7 +315,7 @@
 
     var run = seq([
       begin,
-      [onSuccess, castErrorMsg],
+      [onSuccess, errorMsg],
       end
     ]);
 
@@ -300,20 +330,20 @@
       return transform(state.data, task.msg.value);
     }
 
-    function end(msg/*:Msg*/) {
+    function end(res/*:any*/) {
       var task = state.currentTask;
       state.currentTask = null;
-      if (task) next(task, msg);
+      if (task) next(task, res);
     }
 
     function onSuccess(res/*:TransformResult*/) {
       state.data = res[0];
-      return castValueMsg(res[1]);
+      return res[1];
     }
 
-    function next(task/*:Task*/, msg/*:Msg*/) {
+    function next(task/*:Task*/, value/*:any*/) {
       if (node.child) {
-        processTask(node.child, createTask(task.source, def, msg, task.end));
+        processTasks(node.child, createTasks(task.source, def, value, task.end));
       }
       else {
         task.end();
@@ -420,6 +450,13 @@
     };
   }
 
+  function append(arr, values) {
+    var i = -1;
+    var n = values.length;
+    while (++i < n) arr.push(values[i]);
+    return arr;
+  }
+
   function throwError(e) {
     throw e;
   }
@@ -438,7 +475,8 @@
     exports.trap = trap;
     exports.except = except;
     exports.seq = seq;
-    exports.message = message;
+    exports.msg = msg;
+    exports.list = list;
   } else {
     return {
       input: input,
@@ -450,7 +488,8 @@
       trap: trap,
       except: except,
       seq: seq,
-      message: message
+      msg: msg,
+      list: list
     };
   }
 });
