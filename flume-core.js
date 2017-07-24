@@ -6,7 +6,7 @@
     factory(exports);
   else
     (root/*:any*/).flume = factory({});
-})(this, function(exports) {
+})(this || 0, function(exports) {
   /*::
   type DefType<Type, Parents, Description> = {
     type: Type,
@@ -410,7 +410,7 @@
     return function branchFn(v) {
       var res = fn(v);
       return isThenable(res)
-        ? res.then(partial(ret, v))
+        ? res.then(partial1(ret, v))
         : ret(v, res);
     }
 
@@ -421,8 +421,8 @@
     }
   }
 
-  function partial(fn/*:Function*/, a/*:any*/)/*:Function*/ {
-    return function partialFn(b/*:any*/) {
+  function partial1(fn/*:Function*/, a/*:any*/)/*:Function*/ {
+    return function partial1Fn(b/*:any*/) {
       return fn(a, b);
     }
   }
