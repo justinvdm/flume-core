@@ -118,12 +118,12 @@
     };
   }
 
+  function reduce(initFn/*:Function*/, fn/*:Function*/)/*:TransformDefFn*/ {
+    return transform(initFn, [fn, retTupleVV]);
+  }
+
   function map(fn/*:Function*/)/*:TransformDefFn*/ {
-    return transform(retNull, [
-      retValue,
-      fn,
-      retStateless
-    ]);
+    return transform(retNull, [ret2ndArg, fn, retTupleNullV]);
   }
 
   function filter(fn/*:Function*/)/*:TransformDefFn*/ {
@@ -514,11 +514,15 @@
     return nil;
   }
 
-  function retValue(_/*:**/, v/*:**/)/*:**/ {
+  function ret2ndArg/*::<V>*/(_/*:**/, v/*:V*/)/*:V*/ {
     return v;
   }
 
-  function retStateless/*::<V>*/(v/*:V*/)/*:[null, V]*/ {
+  function retTupleVV/*::<V>*/(v/*:V*/)/*:[V, V]*/ {
+    return [v, v];
+  }
+
+  function retTupleNullV/*::<V>*/(v/*:V*/)/*:[null, V]*/ {
     return [null, v];
   }
 
@@ -537,6 +541,7 @@
   exports.transform = transform;
   exports.map = map;
   exports.filter = filter;
+  exports.reduce = reduce;
   exports.trap = trap;
   exports.except = except;
   exports.seq = seq;
