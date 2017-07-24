@@ -29,11 +29,14 @@
 
   type TransformDefFn = (Def | Def[]) => TransformDef;
 
-  type Msg = {
+  type MsgType<Type> = {
     __flumeType: 'msg',
     type: string,
     value: any
   };
+
+  type Msg = MsgType<string>;
+  type Nil = MsgType<'__nil'>;
 
   type List = {
     __flumeType: 'list',
@@ -91,6 +94,7 @@
     failure: Function
   };
   */
+  var nil = msg('__nil');
 
   function input()/*:InputDef*/ {
     return {
@@ -122,12 +126,8 @@
     ]);
   }
 
-  function retValue(_/*:**/, v/*:**/)/*:**/ {
-    return v;
-  }
-
-  function retStateless(v) {
-    return [null, v];
+  function filter(fn/*:Function*/)/*:TransformDefFn*/ {
+    return map(branch(fn, identity, retNil));
   }
 
   function trap(msgType/*:string*/, fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
@@ -238,7 +238,7 @@
     return obj && obj.__flumeType === type;
   }
 
-  function msg(type/*:string*/, obj/*:any*/)/*Msg*/ {
+  function msg(type/*:string*/, obj/*:any*/)/*:Msg*/ {
     if (isOfType('msg', obj)) return obj;
 
     return {
@@ -406,7 +406,28 @@
     };
   }
 
-  function flattenDeep(values) {
+  function branch(fn/*:Function*/, trueFn/*:Function*/, falseFn/*:Function*/)/*:Function*/ {
+    return function branchFn(v) {
+      var res = fn(v);
+      return isThenable(res)
+        ? res.then(partial(ret, v))
+        : ret(v, res);
+    }
+
+    function ret(v, res) {
+      return res
+        ? trueFn(v)
+        : falseFn(v);
+    }
+  }
+
+  function partial(fn/*:Function*/, a/*:any*/)/*:Function*/ {
+    return function partialFn(b/*:any*/) {
+      return fn(a, b);
+    }
+  }
+
+  function flattenDeep(values/*:any[]*/)/*:any[]*/ {
     var res = [];
     var i = -1;
     var n = values.length;
@@ -452,7 +473,7 @@
   }
 
   function Thenable(isError/*:boolean*/, v/*:any*/) {
-    if ((v || 0).then) return v;
+    if (isThenable(v)) return v;
     this.isError = isError;
     this.v = v;
   }
@@ -470,6 +491,10 @@
     }
   };
 
+  function isThenable(v/*:any*/)/*:boolean*/ {
+    return v && v.then;
+  }
+
   function callOnNth(n/*:number*/, fn/*:Function*/)/*:Function*/ {
     var i = 1;
 
@@ -485,11 +510,23 @@
     return arr;
   }
 
-  function throwError(e) {
+  function retNil()/*:Nil*/ {
+    return nil;
+  }
+
+  function retValue(_/*:**/, v/*:**/)/*:**/ {
+    return v;
+  }
+
+  function retStateless/*::<V>*/(v/*:V*/)/*:[null, V]*/ {
+    return [null, v];
+  }
+
+  function throwError(e/*:any*/)/*:void*/ {
     throw e;
   }
 
-  function identity(v) {
+  function identity/*::<V>*/(v/*:V*/)/*:V*/ {
     return v;
   }
   
@@ -499,9 +536,12 @@
   exports.dispatch = dispatch;
   exports.transform = transform;
   exports.map = map;
+  exports.filter = filter;
   exports.trap = trap;
   exports.except = except;
   exports.seq = seq;
+  exports.branch = branch;
   exports.msg = msg;
-  exports.list = list
+  exports.list = list;
+  exports.identity = identity;
 });

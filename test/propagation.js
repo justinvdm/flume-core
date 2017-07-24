@@ -1,9 +1,8 @@
 // @flow
 import test from 'ava';
-import {pipe, create, input, map, transform, msg, list, trap, dispatch, except} from '..';
-import {immediate, reject, callbacks, badCodePath} from './_utils';
 
-const capture = arr => map(v => arr.push(v));
+import {pipe, create, input, map, transform, msg, list, trap, dispatch, except} from '..';
+import {immediate, reject, callbacks, capture, badCodePath} from './_utils';
 
 test('value propagation', t => {
   const src = input();

@@ -1,7 +1,13 @@
 // @flow
+const {map, identity} = require('..');
+
 const reject = (e: *) => Promise.reject(e);
 
 const immediate = (v: *) => new Promise(resolve => setImmediate(() => resolve(v)));
+
+const badCodePath = (t: *) => () => t.fail('Unexpected code path reached');
+
+const capture = (arr: any[]) => map(v => arr.push(v));
 
 const callbacks = () => {
   let i = 1;
@@ -33,10 +39,7 @@ const callbacks = () => {
   return callbacksFn;
 };
 
-const badCodePath = (t: *) => () => t.fail('Unexpected code path reached');
-
-const identity = v => v;
-
+exports.capture = capture;
 exports.reject = reject;
 exports.immediate = immediate;
 exports.callbacks = callbacks;
