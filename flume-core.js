@@ -9,6 +9,7 @@
 })(this || 0, function(exports) {
   /*::
   type DefType<Type, Parents, Description> = {
+    id: string,
     type: Type,
     parents: Parents,
     description: Description
@@ -51,7 +52,9 @@
   };
 
   type Graph = {
-    inputs: InputNode[]
+    inputs: {
+      [string]: InputNode[]
+    }
   };
 
   type NodeType<Def, Child, State, Methods> = {
@@ -98,6 +101,7 @@
 
   function input()/*:InputDef*/ {
     return {
+      id: genUid(),
       type: 'input',
       parents: null,
       description: null
@@ -107,6 +111,7 @@
   function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformDefFn*/ {
     return function transformFn(parents/*:**/)/*:**/ {
       return {
+        id: genUid(),
         parents: castArray(parents),
         type: 'transform',
         description: {
@@ -145,11 +150,12 @@
   }
 
   function create(tailDef/*:TransformDef*/)/*:Graph*/ {
-    var inputs = [];
+    var inputs = {}
     var queue = [createTransformNode(tailDef, null, 0)];
     var i;
     var n;
     var node;
+    var parentNode;
     var parentDefs;
     var parentDef;
 
@@ -162,7 +168,8 @@
         parentDef = parentDefs[i];
 
         if (parentDef.type === 'input') {
-          inputs.push(createInputNode(parentDef, node, i));
+          parentNode = createInputNode(parentDef, node, i);
+          inputs[parentDef.id] = push(inputs[parentDef.id], parentNode);
         } else {
           queue.push(createTransformNode(parentDef, node, i));
         }
@@ -173,7 +180,7 @@
   }
 
   function dispatch(graph/*:Graph*/, source/*:InputDef*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
-    var inputs = findInputs(graph, source);
+    var inputs = graph.inputs[source.id] || [];
     var n = inputs.length;
     var i = -1;
     var tasks;
@@ -190,21 +197,6 @@
     }
 
     return graph;
-  }
-
-  function findInputs(graph/*:Graph*/, def/*:InputDef*/)/*:InputNode[]*/ {
-    var inputs = graph.inputs;
-    var n = inputs.length;
-    var i = -1;
-    var input;
-    var targets = [];
-
-    while (++i < n) {
-      input = inputs[i];
-      if (input.def === def && input.child) targets.push(input);
-    }
-
-    return targets;
   }
 
   function createInputNode(def/*:InputDef*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
@@ -510,6 +502,12 @@
     return arr;
   }
 
+  function push(arr/*:?any[]*/, v/*:any*/) {
+    arr = arr || [];
+    arr.push(v);
+    return arr;
+  }
+
   function retNil()/*:Nil*/ {
     return nil;
   }
@@ -532,6 +530,12 @@
 
   function identity/*::<V>*/(v/*:V*/)/*:V*/ {
     return v;
+  }
+
+  var uidCounter = 0;
+
+  function genUid()/*:string*/ {
+    return ++uidCounter + '';
   }
   
   exports.input = input;
