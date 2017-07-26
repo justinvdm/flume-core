@@ -44,11 +44,17 @@
     msgs: Msg[]
   };
 
-  type Task = {
-    msg: Msg,
+  type TaskMetadata = {
     source: InputDef,
     parent: Def,
-    end: Function
+    parentIndex: number,
+    graph: Graph
+  };
+
+  type Task = {
+    msg: Msg,
+    end: Function,
+    meta: TaskMetadata,
   };
 
   type Graph = {
@@ -124,11 +130,19 @@
   }
 
   function reduce(initFn/*:Function*/, fn/*:Function*/)/*:TransformDefFn*/ {
-    return transform(initFn, [fn, retTupleVV]);
+    return transform(initFn, [reduceFn, retTupleVV]);
+
+    function reduceFn(state/*:any*/, v/*:any*/) {
+      return fn(state, v);
+    }
   }
 
   function map(fn/*:Function*/)/*:TransformDefFn*/ {
-    return transform(retNull, [ret2ndArg, fn, retTupleNullV]);
+    return transform(retNull, [mapFn, retTupleNullV]);
+
+    function mapFn(_/*:any*/, v/*:any*/) {
+      return fn(v);
+    }
   }
 
   function filter(fn/*:Function*/)/*:TransformDefFn*/ {
@@ -192,7 +206,12 @@
 
     while (++i < n) {
       input = inputs[i];
-      tasks = createTasks(source, input.def, value, end);
+      tasks = createTasks(value, end, {
+        graph: graph,
+        source: source,
+        parent: input.def,
+        parentIndex: input.parentIndex,
+      });
       if (input.child) processTasks(input.child, tasks);
     }
 
@@ -257,25 +276,23 @@
     return msg('__error', e);
   }
 
-  function createTask(source/*:InputDef*/, parent/*:Def*/, msg/*:Msg*/, end/*:Function*/)/*:Task*/ {
-    return {
-      source: source,
-      parent: parent,
-      msg: msg,
-      end: end
-    };
-  }
-
-  function createTasks(source/*:InputDef*/, parent/*:Def*/, value/*:any*/, end/*:Function*/)/*:Task[]*/ {
-    if (!isOfType('list', value)) return [
-      createTask(source, parent, valueMsg(value), end)
-    ];
+  function createTasks(value/*:any*/, end/*:Function*/, meta/*:TaskMetadata*/)/*:Task[]*/ {
+    if (!isOfType('list', value)) return [{
+      msg: valueMsg(value),
+      end: end,
+      meta: meta
+    }];
 
     var msgs = value.msgs;
     var n = msgs.length;
     var i = -1;
     var tasks = [];
-    while (++i < n) tasks.push(createTask(source, parent, msgs[i], end));
+
+    while (++i < n) tasks.push({
+      msg: msgs[i],
+      end: end,
+      meta: meta
+    });
 
     return tasks;
   }
@@ -308,8 +325,10 @@
   }
 
   function createTaskRunner(node/*:TransformNode*/)/*:TaskRunner*/ {
-    var state = node.state;
     var def = node.def;
+    var child = node.child;
+    var state = node.state;
+    var parentIndex = node.parentIndex;
     var description = def.description;
     var msgType = description.msgType;
     var transform = seq(description.transform);
@@ -333,7 +352,7 @@
 
     function begin(task/*:Task*/) {
       state.currentTask = task;
-      return transform(state.data, task.msg.value);
+      return transform(state.data, task.msg.value, task.meta);
     }
 
     function end(res/*:any*/) {
@@ -348,8 +367,14 @@
     }
 
     function next(task/*:Task*/, value/*:any*/) {
-      if (node.child) {
-        processTasks(node.child, createTasks(task.source, def, value, task.end));
+      var meta = task.meta;
+      if (child) {
+        processTasks(child, createTasks(value, task.end, {
+          graph: meta.graph,
+          source: meta.source,
+          parent: def,
+          parentIndex: parentIndex
+        }));
       }
       else {
         task.end();
@@ -510,10 +535,6 @@
 
   function retNil()/*:Nil*/ {
     return nil;
-  }
-
-  function ret2ndArg/*::<V>*/(_/*:**/, v/*:V*/)/*:V*/ {
-    return v;
   }
 
   function retTupleVV/*::<V>*/(v/*:V*/)/*:[V, V]*/ {
