@@ -26,7 +26,7 @@
 
   type Def = InputDef | TransformDef;
 
-  type TransformInitFn = () => any;
+  type TransformInitFn = Graph => any;
 
   type TransformDefFn = (Def | Def[]) => TransformDef;
 
@@ -102,6 +102,8 @@
     success: Function,
     failure: Function
   };
+
+  type MapType<V> = {[string]: V};
   */
   var nil = msg('__nil');
 
@@ -129,8 +131,12 @@
     };
   }
 
-  function reduce(initFn/*:Function*/, fn/*:Function*/)/*:TransformDefFn*/ {
+  function reduce(initValFn/*:Function*/, fn/*:Function*/)/*:TransformDefFn*/ {
     return transform(initFn, [reduceFn, retTupleVV]);
+
+    function initFn() {
+      return initValFn();
+    }
 
     function reduceFn(state/*:any*/, v/*:any*/) {
       return fn(state, v);
@@ -149,6 +155,32 @@
     return map(branch(fn, identity, retNil));
   }
 
+  function joinEvents(mapFn/*:Function*/, inputs/*:MapType<InputDef>*/) {
+    return transform(initFn, transformFn);
+
+    function transformFn(events/*:MapType<Function>*/, v/*:any*/)/*:[MapType<Function>, any]*/ {
+      return [events, mapFn(events, v)];
+    }
+
+    function initFn(graph/*:Graph*/)/*:MapType<Function>*/ {
+      var events = {};
+
+      for (var k in inputs) {
+        if (inputs.hasOwnProperty(k)) {
+          events[k] = createEventDispatcher(graph, inputs[k]);
+        }
+      }
+
+      return events;
+    }
+  }
+
+  function createEventDispatcher(graph/*:Graph*/, input/*:InputDef*/)/*:Function*/ {
+    return function eventDispatcherFn(v/*:any*/) {
+      dispatch(graph, input, v);
+    };
+  }
+
   function trap(msgType/*:string*/, fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
     return function exceptFn(parents/*:**/)/*:**/ {
       var def = fn(parents);
@@ -163,12 +195,18 @@
     return trap('__error', fn);
   }
 
-  function create(tailDef/*:TransformDef*/)/*:Graph*/ {
+  function create(obj/*:Def | Def[]*/) {
+    if (obj.type !== 'transform') obj = map(identity)(obj);
+    return buildGraph(((obj/*:any*/)/*:TransformDef*/));
+  }
+
+  function buildGraph(tailDef/*:TransformDef*/)/*:Graph*/ {
     var inputs = {}
-    var queue = [createTransformNode(tailDef, null, 0)];
+    var node = createTransformNode(tailDef, null, 0);
+    var transforms = [node];
+    var queue = [node];
     var i;
     var n;
-    var node;
     var parentNode;
     var parentDefs;
     var parentDef;
@@ -185,12 +223,28 @@
           parentNode = createInputNode(parentDef, node, i);
           inputs[parentDef.id] = push(inputs[parentDef.id], parentNode);
         } else {
-          queue.push(createTransformNode(parentDef, node, i));
+          parentNode = createTransformNode(parentDef, node, i);
+          transforms.push(parentNode);
+          queue.push(parentNode);
         }
       }
     }
 
-    return {inputs: inputs};
+    var graph = {inputs: inputs};
+    initTransforms(graph, transforms);
+
+    return graph;
+  }
+
+  function initTransforms(graph/*:Graph*/, transforms/*:TransformNode[]*/) {
+    var n = transforms.length;
+    var i = -1;
+    var node;
+
+    while (++i < n) {
+      node = transforms[i];
+      node.state.data = node.def.description.init(graph);
+    }
   }
 
   function dispatch(graph/*:Graph*/, source/*:InputDef*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
@@ -212,6 +266,7 @@
         parent: input.def,
         parentIndex: input.parentIndex,
       });
+
       if (input.child) processTasks(input.child, tasks);
     }
 
@@ -236,8 +291,8 @@
       methods: {},
       state: {
         tasks: [],
-        currentTask: null,
-        data: def.description.init()
+        data: null,
+        currentTask: null
       }
     };
 
@@ -573,5 +628,6 @@
   exports.branch = branch;
   exports.msg = msg;
   exports.list = list;
+  exports.joinEvents = joinEvents;
   exports.identity = identity;
 });
