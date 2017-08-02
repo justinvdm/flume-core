@@ -423,7 +423,8 @@
 
     function next(task/*:Task*/, value/*:any*/) {
       var meta = task.meta;
-      if (child) {
+
+      if (child && value !== nil) {
         processTasks(child, createTasks(value, task.end, {
           graph: meta.graph,
           source: meta.source,
