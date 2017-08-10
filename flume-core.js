@@ -1,4 +1,114 @@
 // @flow
+
+/*::
+export type Id = string;
+
+export type InputDef<V> = {
+  (V): InputValue<V>,
+  id: Id,
+  type: 'input'
+};
+
+type InputValue<V> = {
+  source: InputDef<V>,
+  value: V
+};
+
+type TransformDef = {
+  id: Id,
+  type: 'transform',
+  parents: Def[],
+  description: TransformDescription
+};
+
+type TransformDescription = {
+  msgType: string,
+  init: TransformInitFn,
+  transform: RawSequence
+};
+
+type Def = InputDef<*> | TransformDef;
+
+type TransformInitFn = Graph => any;
+
+type TransformDefFn = (Def | Def[]) => TransformDef;
+
+type MsgType<Type> = {
+  __flumeType: 'msg',
+  type: string,
+  value: any
+};
+
+type Msg = MsgType<string>;
+type Nil = MsgType<'__nil'>;
+
+type List = {
+  __flumeType: 'list',
+  msgs: Msg[]
+};
+
+type TaskMetadata = {
+  source: InputDef<*>,
+  parent: Def,
+  parentIndex: number,
+  graph: Graph
+};
+
+type Task = {
+  msg: Msg,
+  end: Function,
+  meta: TaskMetadata,
+};
+
+type Graph = {
+  inputs: {
+    [string]: InputNode[]
+  }
+};
+
+type NodeType<Def, Child, State, Methods> = {
+  def: Def,
+  child: ?Child,
+  state: State,
+  parentIndex: number,
+  methods: Methods
+};
+
+type InputNode = NodeType<InputDef<*>, TransformNode, null, null>;
+type TransformNode = NodeType<TransformDef, TransformNode, TransformState, Object>;
+type Node = InputNode | TransformNode;
+
+type TransformState = {
+  tasks: Task[],
+  currentTask: ?Task,
+  data: any
+};
+
+type TransformResult = [any, any];
+
+type TaskRunner = Task => void;
+
+type RawSequence = NestedRawSequence | NestedRawSequence[];
+
+type NestedRawSequence =
+  | RawSequence
+  | SequenceStep;
+
+type RawSequenceStep =
+  | Function
+  | {
+    success?: Function,
+    failure?: Function
+  };
+
+type SequenceStep = {
+  success: Function,
+  failure: Function
+};
+
+type MapType<V> = {[string]: V};
+*/
+
 ;(function(root, factory) {
   if (typeof root.define === 'function' && root.define.amd)
     root.define(function() { return factory({}) });
@@ -7,113 +117,22 @@
   else
     (root/*:any*/).flume = factory({});
 })(this || 0, function(exports) {
-  /*::
-  type DefType<Type, Parents, Description> = {
-    id: string,
-    type: Type,
-    parents: Parents,
-    description: Description
-  };
-
-  type InputDef = DefType<'input', null, null>;
-  type TransformDef = DefType<'transform', Def[], TransformDescription>;
-
-  type TransformDescription = {
-    msgType: string,
-    init: TransformInitFn,
-    transform: RawSequence
-  };
-
-  type Def = InputDef | TransformDef;
-
-  type TransformInitFn = Graph => any;
-
-  type TransformDefFn = (Def | Def[]) => TransformDef;
-
-  type MsgType<Type> = {
-    __flumeType: 'msg',
-    type: string,
-    value: any
-  };
-
-  type Msg = MsgType<string>;
-  type Nil = MsgType<'__nil'>;
-
-  type List = {
-    __flumeType: 'list',
-    msgs: Msg[]
-  };
-
-  type TaskMetadata = {
-    source: InputDef,
-    parent: Def,
-    parentIndex: number,
-    graph: Graph
-  };
-
-  type Task = {
-    msg: Msg,
-    end: Function,
-    meta: TaskMetadata,
-  };
-
-  type Graph = {
-    inputs: {
-      [string]: InputNode[]
-    }
-  };
-
-  type NodeType<Def, Child, State, Methods> = {
-    def: Def,
-    child: ?Child,
-    state: State,
-    parentIndex: number,
-    methods: Methods
-  };
-
-  type InputNode = NodeType<InputDef, TransformNode, null, null>;
-  type TransformNode = NodeType<TransformDef, TransformNode, TransformState, Object>;
-  type Node = InputNode | TransformNode;
-
-  type TransformState = {
-    tasks: Task[],
-    currentTask: ?Task,
-    data: any
-  };
-
-  type TransformResult = [any, any];
-
-  type TaskRunner = Task => void;
-
-  type RawSequence = NestedRawSequence | NestedRawSequence[];
-
-  type NestedRawSequence =
-    | RawSequence
-    | SequenceStep;
-
-  type RawSequenceStep =
-    | Function
-    | {
-      success?: Function,
-      failure?: Function
-    };
-
-  type SequenceStep = {
-    success: Function,
-    failure: Function
-  };
-
-  type MapType<V> = {[string]: V};
-  */
   var nil = msg('__nil');
 
-  function input()/*:InputDef*/ {
-    return {
-      id: genUid(),
-      type: 'input',
-      parents: null,
-      description: null
-    };
+  function input/*::<V>*/()/*:InputDef<V>*/ {
+    def.id = genUid();
+    def.type = 'input';
+    def.parents = null;
+    def.description = null;
+
+    function def(value/*:V*/)/*:InputValue<V>*/ {
+      return {
+        source: def,
+        value: value
+      };
+    }
+
+    return def;
   }
 
   function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformDefFn*/ {
@@ -221,7 +240,7 @@
     }
   }
 
-  function dispatch(graph/*:Graph*/, source/*:InputDef*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
+  function dispatch(graph/*:Graph*/, source/*:InputDef<*>*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
     var inputs = graph.inputs[source.id] || [];
     var n = inputs.length;
     var i = -1;
@@ -247,7 +266,7 @@
     return graph;
   }
 
-  function createInputNode(def/*:InputDef*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
+  function createInputNode(def/*:InputDef<*>*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
     return {
       def: def,
       child: child,
