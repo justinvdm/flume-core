@@ -39,7 +39,7 @@
     "babel-register": "^6.24.1",
     "eslint": "^3.7.1",
     "eslint-plugin-flowtype": "^2.34.0",
-    "flow-bin": "^0.48.0"
+    "flow-bin": "^0.52.0"
   },
   "ava": {
     "require": [
@@ -47,6 +47,9 @@
     ]
   },
   "babel": {
-    "presets": ["latest", "flow"]
+    "presets": [
+      "latest",
+      "flow"
+    ]
   }
 }
