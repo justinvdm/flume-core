@@ -14,8 +14,8 @@ test.cb('reduce', t => {
   ]));
 
   const done = callbacks();
-  dispatch(graph, src, 3, done());
-  dispatch(graph, src, 5, done());
+  dispatch(graph, src(3), done());
+  dispatch(graph, src(5), done());
 
   done(() => {
     t.deepEqual(res, [5, 10]);

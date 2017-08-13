@@ -14,8 +14,8 @@ test('value propagation', t => {
     capture(res)
   ]));
 
-  dispatch(graph, src, 21);
-  dispatch(graph, src, 23);
+  dispatch(graph, src(21));
+  dispatch(graph, src(23));
 
   t.deepEqual(res, [45, 70]);
 });
@@ -34,8 +34,8 @@ test('error propagation', t => {
     capture(res)
   ]));
 
-  dispatch(graph, src, 21)
-  dispatch(graph, src, 23);
+  dispatch(graph, src(21));
+  dispatch(graph, src(23));
   t.deepEqual(res, [44, 48]);
 });
 
@@ -49,8 +49,8 @@ test('arbitrary msg propagation', t => {
     capture(res)
   ]));
 
-  dispatch(graph, src, msg('foo', 21))
-  dispatch(graph, src, msg('bar', 23));
+  dispatch(graph, src(msg('foo', 21)));
+  dispatch(graph, src(msg('bar', 23)));
   t.deepEqual(res, [22, 46]);
 });
 
@@ -63,8 +63,8 @@ test('batch propagation', t => {
     capture(res)
   ]));
 
-  dispatch(graph, src, 21);
-  dispatch(graph, src, 23);
+  dispatch(graph, src(21));
+  dispatch(graph, src(23));
 
   t.deepEqual(res, [22, 42, 24, 46]);
 });
@@ -81,8 +81,8 @@ test.cb('async value propagation', t => {
   ]));
 
   const done = callbacks();
-  dispatch(graph, src, 21, done());
-  dispatch(graph, src, 23, done());
+  dispatch(graph, src(21), done());
+  dispatch(graph, src(23), done());
 
   done(() => {
     t.deepEqual(res, [45, 70]);
@@ -106,8 +106,8 @@ test.cb('async error propagation', t => {
   ]));
 
   const done = callbacks();
-  dispatch(graph, src, 21, done())
-  dispatch(graph, src, 23, done());
+  dispatch(graph, src(21), done())
+  dispatch(graph, src(23), done());
 
   done(() => {
     t.deepEqual(res, [44, 48]);
@@ -124,8 +124,8 @@ test('multiple inputs', t => {
   const b = pipe(src2, map(v => v * 2));
   const graph = create(pipe([a, b], capture(res)));
 
-  dispatch(graph, src1, 21);
-  dispatch(graph, src2, 23);
+  dispatch(graph, src1(21));
+  dispatch(graph, src2(23));
 
   t.deepEqual(res, [22, 46]);
 });
@@ -138,8 +138,8 @@ test('multiple inputs of same def', t => {
   const b = pipe(src, map(v => v * 2));
   const graph = create(pipe([a, b], capture(res)));
 
-  dispatch(graph, src, 21);
-  dispatch(graph, src, 23);
+  dispatch(graph, src(21));
+  dispatch(graph, src(23));
 
   t.deepEqual(res, [22, 42, 24, 46]);
 });

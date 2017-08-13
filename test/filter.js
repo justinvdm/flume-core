@@ -14,8 +14,8 @@ test.cb('filter', t => {
   ]));
 
   const done = callbacks();
-  dispatch(graph, src, 2, done());
-  dispatch(graph, src, 3, done());
+  dispatch(graph, src(2), done());
+  dispatch(graph, src(3), done());
 
   done(() => {
     t.deepEqual(res, [3]);

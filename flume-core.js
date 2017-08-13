@@ -3,18 +3,18 @@
 /*::
 export type Id = string;
 
-export type InputDef<V> = {
+export type Input<V> = {
   (V): InputValue<V>,
   id: Id,
   type: 'input'
 };
 
 type InputValue<V> = {
-  source: InputDef<V>,
+  source: Input<V>,
   value: V
 };
 
-type TransformDef = {
+type Transform = {
   id: Id,
   type: 'transform',
   parents: Def[],
@@ -27,11 +27,11 @@ type TransformDescription = {
   transform: RawSequence
 };
 
-type Def = InputDef<*> | TransformDef;
+type Def = Input<*> | Transform;
 
 type TransformInitFn = Graph => any;
 
-type TransformDefFn = (Def | Def[]) => TransformDef;
+type TransformFn = (Def | Def[]) => Transform;
 
 type MsgType<Type> = {
   __flumeType: 'msg',
@@ -48,7 +48,7 @@ type List = {
 };
 
 type TaskMetadata = {
-  source: InputDef<*>,
+  source: Input<*>,
   parent: Def,
   parentIndex: number,
   graph: Graph
@@ -74,8 +74,8 @@ type NodeType<Def, Child, State, Methods> = {
   methods: Methods
 };
 
-type InputNode = NodeType<InputDef<*>, TransformNode, null, null>;
-type TransformNode = NodeType<TransformDef, TransformNode, TransformState, Object>;
+type InputNode = NodeType<Input<*>, TransformNode, null, null>;
+type TransformNode = NodeType<Transform, TransformNode, TransformState, Object>;
 type Node = InputNode | TransformNode;
 
 type TransformState = {
@@ -119,7 +119,7 @@ type MapType<V> = {[string]: V};
 })(this || 0, function(exports) {
   var nil = msg('__nil');
 
-  function input/*::<V>*/()/*:InputDef<V>*/ {
+  function input/*::<V>*/()/*:Input<V>*/ {
     def.id = genUid();
     def.type = 'input';
     def.parents = null;
@@ -135,7 +135,7 @@ type MapType<V> = {[string]: V};
     return def;
   }
 
-  function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformDefFn*/ {
+  function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformFn*/ {
     return function transformFn(parents/*:**/)/*:**/ {
       return {
         id: genUid(),
@@ -150,7 +150,7 @@ type MapType<V> = {[string]: V};
     };
   }
 
-  function reduce(initValFn/*:Function*/, fn/*:Function*/)/*:TransformDefFn*/ {
+  function reduce(initValFn/*:Function*/, fn/*:Function*/)/*:TransformFn*/ {
     return transform(initFn, [reduceFn, retTupleVV]);
 
     function initFn() {
@@ -162,7 +162,7 @@ type MapType<V> = {[string]: V};
     }
   }
 
-  function map(fn/*:Function*/)/*:TransformDefFn*/ {
+  function map(fn/*:Function*/)/*:TransformFn*/ {
     return transform(retNull, [mapFn, retTupleNullV]);
 
     function mapFn(_/*:any*/, v/*:any*/) {
@@ -170,11 +170,11 @@ type MapType<V> = {[string]: V};
     }
   }
 
-  function filter(fn/*:Function*/)/*:TransformDefFn*/ {
+  function filter(fn/*:Function*/)/*:TransformFn*/ {
     return map(branch(fn, identity, retNil));
   }
 
-  function trap(msgType/*:string*/, fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
+  function trap(msgType/*:string*/, fn/*:TransformFn*/)/*:TransformFn*/ {
     return function exceptFn(parents/*:**/)/*:**/ {
       var def = fn(parents);
 
@@ -184,16 +184,16 @@ type MapType<V> = {[string]: V};
     };
   }
 
-  function except(fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
+  function except(fn/*:TransformFn*/)/*:TransformFn*/ {
     return trap('__error', fn);
   }
 
   function create(obj/*:Def | Def[]*/) {
     if (obj.type !== 'transform') obj = map(identity)(obj);
-    return buildGraph(((obj/*:any*/)/*:TransformDef*/));
+    return buildGraph(((obj/*:any*/)/*:Transform*/));
   }
 
-  function buildGraph(tailDef/*:TransformDef*/)/*:Graph*/ {
+  function buildGraph(tailDef/*:Transform*/)/*:Graph*/ {
     var inputs = {}
     var node = createTransformNode(tailDef, null, 0);
     var transforms = [node];
@@ -240,33 +240,36 @@ type MapType<V> = {[string]: V};
     }
   }
 
-  function dispatch(graph/*:Graph*/, source/*:InputDef<*>*/, value/*:any*/, end/*:?Function*/)/*:Graph*/ {
+  function dispatch(graph/*:Graph*/, input/*:InputValue<*>*/, end/*:?Function*/)/*:Graph*/ {
+    var source = input.source;
+    var value = input.value;
     var inputs = graph.inputs[source.id] || [];
     var n = inputs.length;
     var i = -1;
     var tasks;
-    var input;
+    var node;
 
     end = end
       ? callOnNth(n, end)
       : identity;
 
     while (++i < n) {
-      input = inputs[i];
+      node = inputs[i];
+
       tasks = createTasks(value, end, {
         graph: graph,
         source: source,
-        parent: input.def,
-        parentIndex: input.parentIndex,
+        parent: node.def,
+        parentIndex: node.parentIndex,
       });
 
-      if (input.child) processTasks(input.child, tasks);
+      if (node.child) processTasks(node.child, tasks);
     }
 
     return graph;
   }
 
-  function createInputNode(def/*:InputDef<*>*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
+  function createInputNode(def/*:Input<*>*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
     return {
       def: def,
       child: child,
@@ -276,7 +279,7 @@ type MapType<V> = {[string]: V};
     };
   }
 
-  function createTransformNode(def/*:TransformDef*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:TransformNode*/ {
+  function createTransformNode(def/*:Transform*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:TransformNode*/ {
     var node = {
       def: def,
       child: child,
