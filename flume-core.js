@@ -1,114 +1,4 @@
 // @flow
-
-/*::
-export type Id = string;
-
-export type Input<V> = {
-  (V): InputValue<V>,
-  id: Id,
-  type: 'input'
-};
-
-type InputValue<V> = {
-  source: Input<V>,
-  value: V
-};
-
-type Transform = {
-  id: Id,
-  type: 'transform',
-  parents: Def[],
-  description: TransformDescription
-};
-
-type TransformDescription = {
-  msgType: string,
-  init: TransformInitFn,
-  transform: RawSequence
-};
-
-type Def = Input<*> | Transform;
-
-type TransformInitFn = Graph => any;
-
-type TransformFn = (Def | Def[]) => Transform;
-
-type MsgType<Type> = {
-  __flumeType: 'msg',
-  type: string,
-  value: any
-};
-
-type Msg = MsgType<string>;
-type Nil = MsgType<'__nil'>;
-
-type List = {
-  __flumeType: 'list',
-  msgs: Msg[]
-};
-
-type TaskMetadata = {
-  source: Input<*>,
-  parent: Def,
-  parentIndex: number,
-  graph: Graph
-};
-
-type Task = {
-  msg: Msg,
-  end: Function,
-  meta: TaskMetadata,
-};
-
-type Graph = {
-  inputs: {
-    [string]: InputNode[]
-  }
-};
-
-type NodeType<Def, Child, State, Methods> = {
-  def: Def,
-  child: ?Child,
-  state: State,
-  parentIndex: number,
-  methods: Methods
-};
-
-type InputNode = NodeType<Input<*>, TransformNode, null, null>;
-type TransformNode = NodeType<Transform, TransformNode, TransformState, Object>;
-type Node = InputNode | TransformNode;
-
-type TransformState = {
-  tasks: Task[],
-  currentTask: ?Task,
-  data: any
-};
-
-type TransformResult = [any, any];
-
-type TaskRunner = Task => void;
-
-type RawSequence = NestedRawSequence | NestedRawSequence[];
-
-type NestedRawSequence =
-  | RawSequence
-  | SequenceStep;
-
-type RawSequenceStep =
-  | Function
-  | {
-    success?: Function,
-    failure?: Function
-  };
-
-type SequenceStep = {
-  success: Function,
-  failure: Function
-};
-
-type MapType<V> = {[string]: V};
-*/
-
 ;(function(root, factory) {
   if (typeof root.define === 'function' && root.define.amd)
     root.define(function() { return factory({}) });
@@ -627,3 +517,112 @@ type MapType<V> = {[string]: V};
   exports.list = list;
   exports.identity = identity;
 });
+
+/*::
+export type Id = string;
+
+export type Input<V> = {
+  (V): InputValue<V>,
+  id: Id,
+  type: 'input'
+};
+
+type InputValue<V> = {
+  source: Input<V>,
+  value: V
+};
+
+type Transform = {
+  id: Id,
+  type: 'transform',
+  parents: Def[],
+  description: TransformDescription
+};
+
+type TransformDescription = {
+  msgType: string,
+  init: TransformInitFn,
+  transform: RawSequence
+};
+
+type Def = Input<*> | Transform;
+
+type TransformInitFn = Graph => any;
+
+type TransformFn = (Def | Def[]) => Transform;
+
+type MsgType<Type> = {
+  __flumeType: 'msg',
+  type: string,
+  value: any
+};
+
+type Msg = MsgType<string>;
+type Nil = MsgType<'__nil'>;
+
+type List = {
+  __flumeType: 'list',
+  msgs: Msg[]
+};
+
+type TaskMetadata = {
+  source: Input<*>,
+  parent: Def,
+  parentIndex: number,
+  graph: Graph
+};
+
+type Task = {
+  msg: Msg,
+  end: Function,
+  meta: TaskMetadata,
+};
+
+type Graph = {
+  inputs: {
+    [string]: InputNode[]
+  }
+};
+
+type NodeType<Def, Child, State, Methods> = {
+  def: Def,
+  child: ?Child,
+  state: State,
+  parentIndex: number,
+  methods: Methods
+};
+
+type InputNode = NodeType<Input<*>, TransformNode, null, null>;
+type TransformNode = NodeType<Transform, TransformNode, TransformState, Object>;
+type Node = InputNode | TransformNode;
+
+type TransformState = {
+  tasks: Task[],
+  currentTask: ?Task,
+  data: any
+};
+
+type TransformResult = [any, any];
+
+type TaskRunner = Task => void;
+
+type RawSequence = NestedRawSequence | NestedRawSequence[];
+
+type NestedRawSequence =
+  | RawSequence
+  | SequenceStep;
+
+type RawSequenceStep =
+  | Function
+  | {
+    success?: Function,
+    failure?: Function
+  };
+
+type SequenceStep = {
+  success: Function,
+  failure: Function
+};
+
+type MapType<V> = {[string]: V};
+*/
