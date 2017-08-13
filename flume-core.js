@@ -326,8 +326,12 @@
     }
   }
 
-  function pipe(v/*:any*/, fns/*:Function | Function[]*/)/*:any*/ {
-    fns = castArray(fns);
+  /*::
+  declare var pipe: PipeFn;
+  */;
+
+  function pipe(v, rawFns) {
+    var fns = castArray(rawFns);
     var i = -1;
     var n = fns.length;
 
@@ -519,6 +523,8 @@
 });
 
 /*::
+import type {PipeFn} from './types/pipe';
+
 export type Id = string;
 
 export type Input<V> = {
@@ -625,4 +631,5 @@ type SequenceStep = {
 };
 
 type MapType<V> = {[string]: V};
+
 */
