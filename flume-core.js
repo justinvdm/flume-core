@@ -8,6 +8,7 @@
     (root/*:any*/).flume = factory({});
 })(this || 0, function(exports) {
   var nil = msg('__nil');
+  var isArray = Array.isArray;
 
   function input/*::<V>*/()/*:Input<V>*/ {
     def.id = genUid();
@@ -27,6 +28,7 @@
 
   function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformFn*/ {
     return function transformFn(parents/*:**/)/*:**/ {
+      // $FlowFixMe
       return {
         id: genUid(),
         parents: castArray(parents),
@@ -238,8 +240,8 @@
     return tasks;
   }
 
-  function castArray(v/*:any*/)/*:any[]*/ {
-    return !Array.isArray(v)
+  function castArray/*::<V>*/(v/*:V*/)/*:V | [V]*/ {
+    return !isArray(v)
       ? [v]
       : v;
   }
@@ -272,7 +274,7 @@
     var parentIndex = node.parentIndex;
     var description = def.description;
     var msgType = description.msgType;
-    var transform = seq(description.transform);
+    var transform = description.transform;
 
     var parse = {
       success: success,
@@ -293,6 +295,7 @@
 
     function begin(task/*:Task*/) {
       state.currentTask = task;
+      // $FlowFixMe
       return transform(state.data, task.msg.value, task.meta);
     }
 
@@ -328,10 +331,10 @@
 
   /*::
   declare var pipe: PipeFn;
-  */;
+  */
 
-  function pipe(v, rawFns) {
-    var fns = castArray(rawFns);
+  function pipe(v, fns) {
+    if (!isArray(fns)) return fns(v);
     var i = -1;
     var n = fns.length;
 
@@ -348,32 +351,17 @@
     return res;
   }
 
-  function seq(sequence/*:NestedRawSequence*/)/*:Function*/ {
-    var steps = flattenDeep(castArray(sequence))
-      .concat({failure: throwError})
-      .map(normalizeSequenceStep);
+  /*::
+  declare var branch: BranchFn;
+  */
 
-    var n = steps.length;
+  function branch(testFn, trueFn, falseFn) {
+    return branchFn;
 
-    return function sequenceFn() {
-      var i = -1;
-      var p = new Thenable(false, arguments);
-      var step;
-
-      while (++i < n) {
-        step = steps[i];
-        p = p.then(step.success, step.failure);
-      }
-
-      return p;
-    };
-  }
-
-  function branch(fn/*:Function*/, trueFn/*:Function*/, falseFn/*:Function*/)/*:Function*/ {
-    return function branchFn(v) {
-      var res = fn(v);
+    function branchFn(v) {
+      var res = testFn(v);
       return isThenable(res)
-        ? res.then(partial1(ret, v))
+        ? res.then(partialRet(v))
         : ret(v, res);
     }
 
@@ -382,38 +370,32 @@
         ? trueFn(v)
         : falseFn(v);
     }
-  }
 
-  function partial1(fn/*:Function*/, a/*:any*/)/*:Function*/ {
-    return function partial1Fn(b/*:any*/) {
-      return fn(a, b);
+    function partialRet(v) {
+      return function(res) {
+        return ret(v, res);
+      };
     }
   }
 
-  function flattenDeep(values/*:any[]*/)/*:any[]*/ {
-    var res = [];
-    var i = -1;
-    var n = values.length;
-    var v;
+  /*::
+  declare var seq: SeqFn;
+  */
 
-    while (++i < n) {
-      v = values[i];
-      if (Array.isArray(v)) append(res, flattenDeep(v));
-      else res.push(v);
-    }
+  function seq(rawSteps) {
+    var steps = [spread(rawSteps[0])].concat(rawSteps.slice(1))
+      .map(parseStep);
 
-    return res;
+    return function() {
+      var n = steps.length;
+      var i = -1;
+      var v = createResult(false, arguments);
+      while (++i < n) v = stepBind(v, steps[i]);
+      return resolveResult(v);
+    };
   }
 
-  function spread(fn/*:Function*/)/*:Function*/ {
-    return function spreadFn(args/*:any[]*/) {
-      if (args.length === 1) return fn(args[0]);
-      if (args.length === 0) return fn();
-      return fn.apply(null, args);
-    }
-  }
-
-  function normalizeSequenceStep(step/*:RawSequenceStep*/, i/*:number*/)/*:SequenceStep*/ {
+  function parseStep(step) {
     var success;
     var failure;
 
@@ -423,39 +405,60 @@
       failure = step.failure;
     }
 
-    success = success || identity;
-    failure = failure || throwError;
-
-    // first function should take in multiple args
-    if (i === 0) success = spread(success);
-
     return {
-      success: success,
-      failure: failure
+      success: success || identity,
+      failure: failure || throwError
     };
   }
 
-  function Thenable(isError/*:boolean*/, v/*:any*/) {
-    if (isThenable(v)) return v;
-    this.isError = isError;
-    this.v = v;
-  }
+  function stepBind(v, step) {
+    var value = v.value;
 
-  Thenable.prototype.then = function then(success/*:Function*/, failure/*:Function*/) {
-    var v = this.v;
+    if (isThenable(value)) {
+      value = value.then(step.success, step.failure);
+      return createResult(false, value);
+    }
+
+    var fn = v.isError
+      ? step.failure
+      : step.success;
 
     try {
-      return new Thenable(false, this.isError
-        ? failure(v)
-        : success(v))
+      return createResult(false, fn(value));
+    } catch(e) {
+      return createResult(true, e);
     }
-    catch (e) {
-      return new Thenable(true, e);
-    }
-  };
+  }
 
-  function isThenable(v/*:any*/)/*:boolean*/ {
-    return v && v.then;
+  function resolveResult(v) {
+    if (v.isError) throw v.value;
+    return v.value;
+  }
+
+  function isThenable(v) {
+    return v && typeof v === 'object' && v.then;
+  }
+
+  function createResult(isError, v) {
+    return {
+      value: v,
+      isError: isError
+    };
+  }
+
+  /*::
+  declare var spread: (<A,B>((...A) => B) => A => B);
+  */
+
+  function spread(fn) {
+    return function spreadFn(args) {
+      switch (args.length) {
+        case 1: return fn(args[0]);
+        case 2: return fn(args[0], args[1]);
+        case 0: return fn();
+        default: return fn.apply(null, args);
+      }
+    }
   }
 
   function callOnNth(n/*:number*/, fn/*:Function*/)/*:Function*/ {
@@ -491,12 +494,12 @@
     return [null, v];
   }
 
-  function throwError(e/*:any*/)/*:void*/ {
-    throw e;
-  }
-
   function identity/*::<V>*/(v/*:V*/)/*:V*/ {
     return v;
+  }
+
+  function throwError(e) {
+    throw e;
   }
 
   var uidCounter = 0;
@@ -504,7 +507,7 @@
   function genUid()/*:string*/ {
     return ++uidCounter + '';
   }
-  
+
   exports.input = input;
   exports.pipe = pipe;
   exports.create = create;
@@ -524,6 +527,8 @@
 
 /*::
 import type {PipeFn} from './types/pipe';
+import type {SeqFn} from './types/seq';
+import type {BranchFn} from './types/branch';
 
 export type Id = string;
 

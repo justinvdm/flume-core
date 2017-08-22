@@ -58,15 +58,3 @@ test.cb('async error propagation', t => {
     }
   ])(21);
 });
-
-test.cb('nested sequences', t => {
-  seq([
-    v => v + 1,
-    [immediate, [v => v * 3, v => -v], reject],
-    [{failure: v => v * 2}],
-    v => {
-      t.is(v, -132);
-      t.end();
-    }
-  ])(21);
-});
