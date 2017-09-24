@@ -55,9 +55,9 @@
   }
 
   function map(fn/*:Function*/)/*:TransformFn*/ {
-    return transform(retNull, [mapFn, retTupleNullV]);
+    return transform(retNull, seq([mapFn, retTupleNullV]));
 
-    function mapFn(_/*:any*/, v/*:any*/) {
+    function mapFn/*::<V>*/(_/*:mixed*/, v/*:V*/) {
       return fn(v);
     }
   }
@@ -634,7 +634,4 @@ type SequenceStep = {
   success: Function,
   failure: Function
 };
-
-type MapType<V> = {[string]: V};
-
 */
