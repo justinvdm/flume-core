@@ -9,6 +9,7 @@ test.cb('reduce', t => {
   const res = [];
 
   const graph = create(pipe(src, [
+    // $FlowFixMe
     reduce(() => 2, (a, b) => immediate(a + b)),
     capture(res)
   ]));

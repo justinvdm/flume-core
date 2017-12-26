@@ -1,6 +1,8 @@
 // @flow
+
 export type InputDef<V> = {
   (V): InputValue<V>,
+  // $FlowFixMe
   id: Id,
   type: 'input'
 };
@@ -17,7 +19,10 @@ export type InputValue<V> = {
   value: V
 };
 
+// $FlowFixMe
 export type TransformInitFn<State> = Graph => State;
+
+// $FlowFixMe
 export type TransformFn<State, A, B> = (state: State, a: A) => [State, B];
 
 export type ParentDef<V> =
@@ -25,6 +30,7 @@ export type ParentDef<V> =
   | InputDef<V>;
 
 export type TransformDefFn<State,A,B>
+  // $FlowFixMe
   = (ParentDef<A>[]) => TransformDef<State, A, B>;
 
 export type TransformDescription<State, A, B> = {

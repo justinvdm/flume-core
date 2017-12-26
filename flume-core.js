@@ -10,7 +10,7 @@
   var nil = msg('__nil');
   var isArray = Array.isArray;
 
-  function input/*::<V>*/()/*:Input<V>*/ {
+  function input/*::<V>*/()/*:InputDef<V>*/ {
     def.id = genUid();
     def.type = 'input';
     def.parents = null;
@@ -26,12 +26,11 @@
     return def;
   }
 
-  function transform(init/*:TransformInitFn*/, transform/*:RawSequence*/)/*:TransformFn*/ {
-    return function transformFn(parents/*:**/)/*:**/ {
-      // $FlowFixMe
+  function transform/*::<State,A,B>*/(init/*:TransformInitFn<State>*/, transform/*:TransformFn<State,A,B>*/)/*:TransformDefFn<State,A,B>*/ {
+    return function transformFn(parents/*:ParentDef<A>[]*/) {
       return {
         id: genUid(),
-        parents: castArray(parents),
+        parents: parents,
         type: 'transform',
         description: {
           init: init,
@@ -42,31 +41,32 @@
     };
   }
 
-  function reduce(initValFn/*:Function*/, fn/*:Function*/)/*:TransformFn*/ {
-    return transform(initFn, [reduceFn, retTupleVV]);
+  function reduce/*::<V>*/(initValFn/*:() => V*/, fn/*:(V, V) => V*/)/*:TransformDefFn<V,V,V>*/ {
+    return transform(initFn, seq([reduceFn, retTupleVV]));
 
     function initFn() {
       return initValFn();
     }
 
-    function reduceFn(state/*:any*/, v/*:any*/) {
+    function reduceFn(state/*:V*/, v/*:V*/) {
       return fn(state, v);
     }
   }
 
-  function map(fn/*:Function*/)/*:TransformFn*/ {
+  function map/*::<A,B>*/(fn/*:A => B*/)/*:TransformDefFn<null,A,B>*/ {
     return transform(retNull, seq([mapFn, retTupleNullV]));
 
-    function mapFn/*::<V>*/(_/*:mixed*/, v/*:V*/) {
+    function mapFn(state/*:null*/, v/*:A*/)/*:B*/ {
       return fn(v);
     }
   }
 
-  function filter(fn/*:Function*/)/*:TransformFn*/ {
+  function filter/*::<V>*/(fn/*:V => Result<boolean>*/)/*:TransformDefFn<null,V,V>*/ {
     return map(branch(fn, identity, retNil));
   }
 
-  function trap(msgType/*:string*/, fn/*:TransformFn*/)/*:TransformFn*/ {
+  // $FlowFixMe
+  function trap(msgType/*:string*/, fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
     return function exceptFn(parents/*:**/)/*:**/ {
       var def = fn(parents);
 
@@ -76,15 +76,20 @@
     };
   }
 
-  function except(fn/*:TransformFn*/)/*:TransformFn*/ {
+  // $FlowFixMe
+  function except(fn/*:TransformDefFn*/)/*:TransformDefFn*/ {
     return trap('__error', fn);
   }
 
-  function create(obj/*:Def | Def[]*/) {
+  // $FlowFixMe
+  function create(obj/*:Parent | Def[]*/) {
     if (obj.type !== 'transform') obj = map(identity)(obj);
+
+    // $FlowFixMe
     return buildGraph(((obj/*:any*/)/*:Transform*/));
   }
 
+  // $FlowFixMe
   function buildGraph(tailDef/*:Transform*/)/*:Graph*/ {
     var inputs = {}
     var node = createTransformNode(tailDef, null, 0);
@@ -121,6 +126,7 @@
     return graph;
   }
 
+  // $FlowFixMe
   function initTransforms(graph/*:Graph*/, transforms/*:TransformNode[]*/) {
     var n = transforms.length;
     var i = -1;
@@ -161,7 +167,8 @@
     return graph;
   }
 
-  function createInputNode(def/*:Input<*>*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
+  // $FlowFixMe
+  function createInputNode(def/*:InputDef<*>*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:InputNode*/ {
     return {
       def: def,
       child: child,
@@ -171,6 +178,7 @@
     };
   }
 
+  // $FlowFixMe
   function createTransformNode(def/*:Transform*/, child/*:?TransformNode*/, parentIndex/*:number*/)/*:TransformNode*/ {
     var node = {
       def: def,
@@ -192,6 +200,7 @@
     return obj && obj.__flumeType === type;
   }
 
+  // $FlowFixMe
   function msg(type/*:string*/, obj/*:any*/)/*:Msg*/ {
     if (isOfType('msg', obj)) return obj;
 
@@ -202,6 +211,7 @@
     };
   }
 
+  // $FlowFixMe
   function list(obj/*:any*/)/*:List*/ {
     if (isOfType('list', obj)) return obj;
 
@@ -219,6 +229,7 @@
     return msg('__error', e);
   }
 
+  // $FlowFixMe
   function createTasks(value/*:any*/, end/*:Function*/, meta/*:TaskMetadata*/)/*:Task[]*/ {
     if (!isOfType('list', value)) return [{
       msg: valueMsg(value),
@@ -250,12 +261,14 @@
     return null;
   }
 
+  // $FlowFixMe
   function processTasks(node/*:TransformNode*/, tasks/*:Task[]*/) {
     var state = node.state;
     append(state.tasks, tasks);
     runNextTask(node);
   }
 
+  // $FlowFixMe
   function runNextTask(node/*:TransformNode*/) {
     var state = node.state;
     if (state.currentTask) return;
@@ -267,6 +280,7 @@
     node.methods.run(task);
   }
 
+  // $FlowFixMe
   function createTaskRunner(node/*:TransformNode*/)/*:TaskRunner*/ {
     var def = node.def;
     var child = node.child;
@@ -287,15 +301,16 @@
       end
     ]);
 
+    // $FlowFixMe
     return function taskRunnerFn(task/*:Task*/) {
       var msg = task.msg;
       if (msg.type === msgType) run(task);
       else next(task, msg);
     };
 
+    // $FlowFixMe
     function begin(task/*:Task*/) {
       state.currentTask = task;
-      // $FlowFixMe
       return transform(state.data, task.msg.value, task.meta);
     }
 
@@ -305,11 +320,13 @@
       if (task) next(task, res);
     }
 
+    // $FlowFixMe
     function success(res/*:TransformResult*/) {
       state.data = res[0];
       return res[1];
     }
 
+    // $FlowFixMe
     function next(task/*:Task*/, value/*:any*/) {
       var meta = task.meta;
 
@@ -482,6 +499,7 @@
     return arr;
   }
 
+  // $FlowFixMe
   function retNil()/*:Nil*/ {
     return nil;
   }
@@ -529,109 +547,12 @@
 import type {PipeFn} from './types/pipe';
 import type {SeqFn} from './types/seq';
 import type {BranchFn} from './types/branch';
-
-export type Id = string;
-
-export type Input<V> = {
-  (V): InputValue<V>,
-  id: Id,
-  type: 'input'
-};
-
-type InputValue<V> = {
-  source: Input<V>,
-  value: V
-};
-
-type Transform = {
-  id: Id,
-  type: 'transform',
-  parents: Def[],
-  description: TransformDescription
-};
-
-type TransformDescription = {
-  msgType: string,
-  init: TransformInitFn,
-  transform: RawSequence
-};
-
-type Def = Input<*> | Transform;
-
-type TransformInitFn = Graph => any;
-
-type TransformFn = (Def | Def[]) => Transform;
-
-type MsgType<Type> = {
-  __flumeType: 'msg',
-  type: string,
-  value: any
-};
-
-type Msg = MsgType<string>;
-type Nil = MsgType<'__nil'>;
-
-type List = {
-  __flumeType: 'list',
-  msgs: Msg[]
-};
-
-type TaskMetadata = {
-  source: Input<*>,
-  parent: Def,
-  parentIndex: number,
-  graph: Graph
-};
-
-type Task = {
-  msg: Msg,
-  end: Function,
-  meta: TaskMetadata,
-};
-
-type Graph = {
-  inputs: {
-    [string]: InputNode[]
-  }
-};
-
-type NodeType<Def, Child, State, Methods> = {
-  def: Def,
-  child: ?Child,
-  state: State,
-  parentIndex: number,
-  methods: Methods
-};
-
-type InputNode = NodeType<Input<*>, TransformNode, null, null>;
-type TransformNode = NodeType<Transform, TransformNode, TransformState, Object>;
-type Node = InputNode | TransformNode;
-
-type TransformState = {
-  tasks: Task[],
-  currentTask: ?Task,
-  data: any
-};
-
-type TransformResult = [any, any];
-
-type TaskRunner = Task => void;
-
-type RawSequence = NestedRawSequence | NestedRawSequence[];
-
-type NestedRawSequence =
-  | RawSequence
-  | SequenceStep;
-
-type RawSequenceStep =
-  | Function
-  | {
-    success?: Function,
-    failure?: Function
-  };
-
-type SequenceStep = {
-  success: Function,
-  failure: Function
-};
+import type {InputNode, TransformNode, Graph} from './types/graph';
+import type {Task, TaskMetadata} from './types/task';
+import type {Result} from './types/async';
+import type {NilMsg} from './types/msg';
+import type {
+  InputDef, TransformDef, ParentDef, InputValue, TransformInitFn,
+  TransformFn, TransformDefFn
+} from './types/def';
 */

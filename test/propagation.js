@@ -4,6 +4,17 @@ import test from 'ava';
 import {pipe, create, input, map, transform, msg, list, trap, dispatch, except} from '..';
 import {immediate, reject, callbacks, capture, badCodePath} from './_utils';
 
+test('foo', () => {
+  const src = input();
+
+  const graph = create(pipe(src, [
+    map((v: number) => v + 1),
+    map((v: string) => v + 'bar')
+  ]));
+
+  dispatch(graph, src('rar'));
+});
+
 test('value propagation', t => {
   const src = input();
   const res = [];
@@ -74,6 +85,7 @@ test.cb('async value propagation', t => {
   const res = [];
 
   const graph = create(pipe(src, [
+    // $FlowFixMe
     transform(() => 2, (state, v) => immediate([state + v, state + (v * 2)])),
     map(v => immediate(v + 1)),
     map(immediate),
