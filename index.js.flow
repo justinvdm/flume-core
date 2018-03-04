@@ -1,1 +1,31 @@
 // @flow
+/* eslint-disable no-undef */
+
+type Flume$MsgType<Type, Value> = {
+  __flumeKind: 'msg',
+  type: Type,
+  value: Value
+}
+
+type Flume$ValueMsg<Value> = Flume$MsgType<'value', Value>
+type Flume$ErrorMsg<Value> = Flume$MsgType<'error', Value>
+type Flume$CommandMsg<Value> = Flume$MsgType<'command', Value>
+
+type Flume$Msg<Value> =
+  | Flume$ValueMsg<Value>
+  | Flume$ErrorMsg<Value>
+  | Flume$CommandMsg<Value>
+
+export type Msg<Value> = Flume$Msg<Value>
+export type ValueMsg<Value> = Flume$ValueMsg<Value>
+export type ErrorMsg<Value> = Flume$ErrorMsg<Value>
+export type CommandMsg<Value> = Flume$CommandMsg<Value>
+
+declare export function valueMsg<A>(A): Flume$ValueMsg<A>
+
+export const msgBind = <A, B>(
+  fn: A => Flume$Msg<B> | B
+): ((Flume$Msg<A> | A) => Flume$Msg<B> | B) => ma =>
+  (ma || 0).__flumeKind === 'msg'
+    ? fn(((ma: any): Flume$Msg<A>).value)
+    : fn(((ma: any): A))
