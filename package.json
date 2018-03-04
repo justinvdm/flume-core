@@ -28,11 +28,12 @@
   "devDependencies": {
     "ava": "latest",
     "babel-eslint": "latest",
+    "eslint-plugin-flowtype": "latest",
     "flow-bin": "latest",
-    "prettier-standard": "latest",
-    "standard": "latest",
     "np": "latest",
-    "eslint-plugin-flowtype": "latest"
+    "pipe-with": "latest",
+    "prettier-standard": "latest",
+    "standard": "latest"
   },
   "standard": {
     "parser": "babel-eslint",
