@@ -1,13 +1,1 @@
-# flume-core
-
-[![Build Status](https://travis-ci.org/justinvdm/flume-core.svg?branch=master)](https://travis-ci.org/justinvdm/flume-core)
-
-> core library for [flume](https://github.com/justinvdm/flume)
-
-See [flume](https://github.com/justinvdm/flume) for docs.
-
-## install
-
-```
-$ npm i -S flume-core
-```
+This used to be where the core library of [flume](https://github.com/justinvdm/flume) lived. It has now moved into the [flume repo](https://github.com/justinvdm/flume).
